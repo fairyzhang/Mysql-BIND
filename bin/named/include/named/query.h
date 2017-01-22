@@ -31,6 +31,7 @@
 #include <dns/types.h>
 
 #include <named/types.h>
+#include <dns/mysqlip.h>
 
 /*% nameserver database version structure */
 typedef struct ns_dbversion {

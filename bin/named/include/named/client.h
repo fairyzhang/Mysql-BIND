@@ -141,6 +141,21 @@ struct ns_client {
 	isc_netaddr_t		destaddr;
 	struct in6_pktinfo	pktinfo;
 	isc_event_t		ctlevent;
+
+	 /*
+       * Information of client IP address whose effect is like VIEW for intelligent DNS.
+       * They are read from Mysql database.
+       * Add by Fairy at 2012-09-06
+       */
+       struct {
+               isc_int16_t isp_id;
+               isc_int16_t location_id;
+               isc_int16_t idc_id;
+       }ipinfo;
+
+       /*DNS IP DATABASE infomation for Intelligent DNS*/
+       dns_mysqlip_t           db_ipinfo;
+
 #ifdef ALLOW_FILTER_AAAA_ON_V4
 	dns_v4_aaaa_t		filter_aaaa;
 #endif

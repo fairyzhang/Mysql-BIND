@@ -64,6 +64,7 @@ static isc_logmodule_t modules[] = {
 	{ "notify",	 		0 },
 	{ "control",	 		0 },
 	{ "lwresd",	 		0 },
+	{ "msqlupt",	 		0 },
 	{ NULL, 			0 }
 };
 

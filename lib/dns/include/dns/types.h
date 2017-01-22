@@ -263,8 +263,11 @@ enum {
 #define dns_opcode_status		((dns_opcode_t)dns_opcode_status)
 	dns_opcode_notify = 4,
 #define dns_opcode_notify		((dns_opcode_t)dns_opcode_notify)
-	dns_opcode_update = 5		/* dynamic update */
+	dns_opcode_update = 5,		/* dynamic update */
 #define dns_opcode_update		((dns_opcode_t)dns_opcode_update)
+	dns_opcode_msqlupt = 6		/* MysqlDB dynamic update */
+#define dns_opcode_msqlupt	((dns_opcode_t)dns_opcode_msqlupt)
+
 };
 
 /*%

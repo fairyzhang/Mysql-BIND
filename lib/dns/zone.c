@@ -1525,6 +1525,10 @@ zone_load(dns_zone_t *zone, unsigned int flags) {
 		/*
 		 * The zone has no master file configured.
 		 */
+		if(zone->db->methods != NULL){
+			if(zone->db->methods->update != NULL)
+				zone->db->methods->update(zone->db, NULL);
+		}
 		result = ISC_R_SUCCESS;
 		goto cleanup;
 	}
@@ -2050,13 +2054,13 @@ zone_check_mx(dns_zone_t *zone, dns_db_t *db, dns_name_t *name,
 	foundname = dns_fixedname_name(&fixed);
 
 	result = dns_db_find(db, name, NULL, dns_rdatatype_a,
-			     0, 0, NULL, foundname, NULL, NULL);
+			     0, 0, NULL, foundname, NULL, NULL, NULL);
 	if (result == ISC_R_SUCCESS)
 		return (ISC_TRUE);
 
 	if (result == DNS_R_NXRRSET) {
 		result = dns_db_find(db, name, NULL, dns_rdatatype_aaaa,
-				     0, 0, NULL, foundname, NULL, NULL);
+				     0, 0, NULL, foundname, NULL, NULL, NULL);
 		if (result == ISC_R_SUCCESS)
 			return (ISC_TRUE);
 	}
@@ -2139,13 +2143,13 @@ zone_check_srv(dns_zone_t *zone, dns_db_t *db, dns_name_t *name,
 	foundname = dns_fixedname_name(&fixed);
 
 	result = dns_db_find(db, name, NULL, dns_rdatatype_a,
-			     0, 0, NULL, foundname, NULL, NULL);
+			     0, 0, NULL, foundname, NULL, NULL, NULL);
 	if (result == ISC_R_SUCCESS)
 		return (ISC_TRUE);
 
 	if (result == DNS_R_NXRRSET) {
 		result = dns_db_find(db, name, NULL, dns_rdatatype_aaaa,
-				     0, 0, NULL, foundname, NULL, NULL);
+				     0, 0, NULL, foundname, NULL, NULL, NULL);
 		if (result == ISC_R_SUCCESS)
 			return (ISC_TRUE);
 	}
@@ -2227,7 +2231,7 @@ zone_check_glue(dns_zone_t *zone, dns_db_t *db, dns_name_t *name,
 
 	result = dns_db_find(db, name, NULL, dns_rdatatype_a,
 			     DNS_DBFIND_GLUEOK, 0, NULL,
-			     foundname, &a, NULL);
+			     foundname, &a, NULL, NULL);
 
 	if (result == ISC_R_SUCCESS) {
 		dns_rdataset_disassociate(&a);
@@ -2239,7 +2243,7 @@ zone_check_glue(dns_zone_t *zone, dns_db_t *db, dns_name_t *name,
 	    result == DNS_R_GLUE) {
 		tresult = dns_db_find(db, name, NULL, dns_rdatatype_aaaa,
 				     DNS_DBFIND_GLUEOK, 0, NULL,
-				     foundname, &aaaa, NULL);
+				     foundname, &aaaa, NULL, NULL);
 		if (tresult == ISC_R_SUCCESS) {
 			dns_rdataset_disassociate(&aaaa);
 			return (ISC_TRUE);
@@ -3524,7 +3528,7 @@ sync_keyzone(dns_zone_t *zone, dns_db_t *db) {
 					     dns_rdatatype_keydata,
 					     DNS_DBFIND_NOWILD, 0, NULL,
 					     dns_fixedname_name(&fname),
-					     NULL, NULL);
+					     NULL, NULL, NULL);
 			if (result != ISC_R_SUCCESS)
 				result = create_keydata(zone, db, ver, &diff,
 							sr, &keynode, &changed);
@@ -4128,13 +4132,13 @@ zone_check_ns(dns_zone_t *zone, dns_db_t *db, dns_dbversion_t *version,
 	foundname = dns_fixedname_name(&fixed);
 
 	result = dns_db_find(db, name, version, dns_rdatatype_a,
-			     0, 0, NULL, foundname, NULL, NULL);
+			     0, 0, NULL, foundname, NULL, NULL, NULL);
 	if (result == ISC_R_SUCCESS)
 		return (ISC_TRUE);
 
 	if (result == DNS_R_NXRRSET) {
 		result = dns_db_find(db, name, version, dns_rdatatype_aaaa,
-				     0, 0, NULL, foundname, NULL, NULL);
+				     0, 0, NULL, foundname, NULL, NULL, NULL);
 		if (result == ISC_R_SUCCESS)
 			return (ISC_TRUE);
 	}
@@ -6420,7 +6424,7 @@ zone_nsec3chain(dns_zone_t *zone) {
 			result = dns_db_find(db, name, version,
 					     dns_rdatatype_soa,
 					     DNS_DBFIND_NOWILD, 0, NULL, found,
-					     NULL, NULL);
+					     NULL, NULL, NULL);
 			if ((result == DNS_R_DELEGATION ||
 			    result == DNS_R_DNAME) &&
 			    !dns_name_equal(name, found)) {
@@ -6655,7 +6659,7 @@ zone_nsec3chain(dns_zone_t *zone) {
 			result = dns_db_find(db, name, version,
 					     dns_rdatatype_soa,
 					     DNS_DBFIND_NOWILD, 0, NULL, found,
-					     NULL, NULL);
+					     NULL, NULL, NULL);
 			if ((result == DNS_R_DELEGATION ||
 			     result == DNS_R_DNAME) &&
 			    !dns_name_equal(name, found)) {
@@ -7266,7 +7270,7 @@ zone_sign(dns_zone_t *zone) {
 			result = dns_db_find(db, name, version,
 					     dns_rdatatype_soa,
 					     DNS_DBFIND_NOWILD, 0, NULL, found,
-					     NULL, NULL);
+					     NULL, NULL, NULL);
 			if ((result == DNS_R_DELEGATION ||
 			    result == DNS_R_DNAME) &&
 			    !dns_name_equal(name, found)) {

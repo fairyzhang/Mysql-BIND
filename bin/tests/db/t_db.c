@@ -229,7 +229,7 @@ t_dns_db_load(char **av) {
 			0,
 			&nodep,
 			dns_fixedname_name(&dns_foundname),
-			&rdataset, NULL);
+			&rdataset, NULL, NULL);
 
 	if (dns_result != exp_find_result) {
 		t_info("dns_db_find returned %s, expected %s\n",
@@ -870,7 +870,7 @@ t_dns_db_currentversion(char **av) {
 			0,
 			&nodep,
 			dns_fixedname_name(&dns_foundname),
-			&rdataset, NULL);
+			&rdataset, NULL, NULL);
 
 	if (dns_result != ISC_R_SUCCESS) {
 		t_info("unable to find %s using current version\n", findname);
@@ -942,7 +942,7 @@ t_dns_db_currentversion(char **av) {
 			0,
 			&nodep,
 			dns_fixedname_name(&dns_foundname),
-			&rdataset, NULL);
+			&rdataset, NULL, NULL);
 
 	if ((dns_result != ISC_R_NOTFOUND) && (dns_result != DNS_R_NXDOMAIN)) {
 		t_info("unexpectedly found %s using current version\n",
@@ -967,7 +967,7 @@ t_dns_db_currentversion(char **av) {
 	dns_result = dns_db_find(db, dns_fixedname_name(&dns_findname),
 				 cversionp, rdatatype, DNS_DBFIND_GLUEOK,
 				 0, &nodep, dns_fixedname_name(&dns_foundname),
-				 &rdataset, NULL);
+				 &rdataset, NULL, NULL);
 
 	/*
 	 * And expect it to succeed.
@@ -1252,7 +1252,7 @@ t_dns_db_newversion(char **av) {
 	dns_result = dns_db_find(db, dns_fixedname_name(&dns_newname),
 				 nversionp, rdatatype, 0, 0, &found_nodep,
 				 dns_fixedname_name(&dns_foundname),
-				 &found_rdataset, NULL);
+				 &found_rdataset, NULL, NULL);
 
 	if (dns_result != ISC_R_SUCCESS) {
 		/* XXXWPK - NXRRSET ???  reference counts ??? */
@@ -1639,7 +1639,7 @@ t_dns_db_closeversion_1(char **av) {
 			0,
 			&nodep,
 			dns_fixedname_name(&dns_foundname),
-			&found_rdataset, NULL);
+			&found_rdataset, NULL, NULL);
 
 	if (dns_result != ISC_R_SUCCESS) {
 		/* XXXWPK NXRRSET ??? reference counting ??? */
@@ -1697,7 +1697,7 @@ t_dns_db_closeversion_1(char **av) {
 				 cversionp, existing_rdatatype,
 				 0, 0, &nodep,
 				 dns_fixedname_name(&dns_foundname),
-				 &found_rdataset, NULL);
+				 &found_rdataset, NULL, NULL);
 
 
 	if ((dns_result != ISC_R_NOTFOUND) && (dns_result != DNS_R_NXDOMAIN)) {
@@ -2041,7 +2041,7 @@ t_dns_db_closeversion_2(char **av) {
 	dns_result = dns_db_find(db, dns_fixedname_name(&dns_newname),
 				 nversionp, new_rdatatype, 0, 0, &nodep,
 				 dns_fixedname_name(&dns_foundname),
-				 &found_rdataset, NULL);
+				 &found_rdataset, NULL, NULL);
 
 	if ((dns_result == ISC_R_NOTFOUND) ||
 	    (dns_result == DNS_R_NXDOMAIN) ||
@@ -2104,7 +2104,7 @@ t_dns_db_closeversion_2(char **av) {
 			0,
 			&nodep,
 			dns_fixedname_name(&dns_foundname),
-			&found_rdataset, NULL);
+			&found_rdataset, NULL, NULL);
 
 
 	if ((dns_result != ISC_R_NOTFOUND) && (dns_result != DNS_R_NXDOMAIN)) {
@@ -2141,7 +2141,7 @@ t_dns_db_closeversion_2(char **av) {
 			0,
 			&nodep,
 			dns_fixedname_name(&dns_foundname),
-			&found_rdataset, NULL);
+			&found_rdataset, NULL, NULL);
 
 	if ((dns_result != ISC_R_NOTFOUND) && (dns_result != DNS_R_NXDOMAIN)) {
 		t_info("dns_db_find %s returned %s\n", new_name,
@@ -2166,7 +2166,7 @@ t_dns_db_closeversion_2(char **av) {
 	dns_result = dns_db_find(db, dns_fixedname_name(&dns_existingname),
 				 cversionp, existing_rdatatype, 0, 0,
 				 &nodep, dns_fixedname_name(&dns_foundname),
-				 &found_rdataset, NULL);
+				 &found_rdataset, NULL, NULL);
 
 
 	if ((dns_result == ISC_R_NOTFOUND) ||
@@ -2369,7 +2369,7 @@ t_dns_db_expirenode(char **av) {
 				 find_expire_time,
 				 &nodep,
 				 dns_fixedname_name(&dns_foundname),
-				 &rdataset, NULL);
+				 &rdataset, NULL, NULL);
 
 	if (dns_result == exp_result) {
 		result = T_PASS;
@@ -2736,7 +2736,7 @@ t_dns_db_findnode_2(char **av) {
 			0,
 			&newnodep,
 			dns_fixedname_name(&dns_foundname),
-			&rdataset, NULL);
+			&rdataset, NULL, NULL);
 	if ((dns_result != ISC_R_NOTFOUND) && (dns_result != DNS_R_NXDOMAIN)) {
 		dns_db_detachnode(db, &newnodep);
 	}
@@ -2938,7 +2938,7 @@ t_dns_db_find_x(char **av) {
 			ftime,
 			&nodep,
 			dns_fixedname_name(&dns_foundname),
-			&rdataset, NULL);
+			&rdataset, NULL, NULL);
 
 	if (dns_result != exp_result) {
 		t_info("dns_db_find %s %s unexpectedly returned %s, "

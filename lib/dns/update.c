@@ -545,7 +545,7 @@ rrset_visible(dns_db_t *db, dns_dbversion_t *ver, dns_name_t *name,
 	dns_fixedname_init(&fixed);
 	result = dns_db_find(db, name, ver, type, DNS_DBFIND_NOWILD,
 			     (isc_stdtime_t) 0, NULL,
-			     dns_fixedname_name(&fixed), NULL, NULL);
+			     dns_fixedname_name(&fixed), NULL, NULL, NULL);
 	switch (result) {
 	case ISC_R_SUCCESS:
 		*visible = ISC_TRUE;
@@ -841,7 +841,7 @@ is_active(dns_db_t *db, dns_dbversion_t *ver, dns_name_t *name,
 			     DNS_DBFIND_GLUEOK | DNS_DBFIND_NOWILD,
 			     (isc_stdtime_t) 0, NULL,
 			     dns_fixedname_name(&foundname),
-			     NULL, NULL);
+			     NULL, NULL,NULL);
 	if (result == ISC_R_SUCCESS || result == DNS_R_EMPTYNAME) {
 		*flag = ISC_TRUE;
 		*cut = ISC_FALSE;
@@ -859,7 +859,7 @@ is_active(dns_db_t *db, dns_dbversion_t *ver, dns_name_t *name,
 			if (dns_db_find(db, name, ver, dns_rdatatype_ds, 0,
 					(isc_stdtime_t) 0, NULL,
 					dns_fixedname_name(&foundname),
-					NULL, NULL) == DNS_R_NXRRSET)
+					NULL, NULL, NULL) == DNS_R_NXRRSET)
 				*unsecure = ISC_TRUE;
 			else
 				*unsecure = ISC_FALSE;
@@ -948,7 +948,7 @@ next_active(dns_update_log_t *log, dns_zone_t *zone, dns_db_t *db,
 			result = dns_db_find(db, newname, ver,
 					     dns_rdatatype_soa,
 					     DNS_DBFIND_NOWILD, 0, NULL, found,
-					     NULL, NULL);
+					     NULL, NULL, NULL);
 			if (result == ISC_R_SUCCESS ||
 			    result == DNS_R_EMPTYNAME ||
 			    result == DNS_R_NXRRSET ||

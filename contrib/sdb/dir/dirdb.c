@@ -64,11 +64,11 @@ static dns_sdbimplementation_t *dirdb = NULL;
 static isc_result_t
 dirdb_lookup(const char *zone, const char *name, void *dbdata,
 	      dns_sdblookup_t *lookup, dns_clientinfomethods_t *methods,
-	      dns_clientinfo_t *clientinfo)
+	      dns_clientinfo_t *clientinfo,void *source_ip,dns_rdatatype_t type, void *zone_data)
 #else
 static isc_result_t
 dirdb_lookup(const char *zone, const char *name, void *dbdata,
-	      dns_sdblookup_t *lookup)
+	      dns_sdblookup_t *lookup,void *source_ip,dns_rdatatype_t type, void *zone_data)
 #endif /* DNS_CLIENTINFO_VERSION */
 {
 	char filename[255];
@@ -84,7 +84,10 @@ dirdb_lookup(const char *zone, const char *name, void *dbdata,
 	UNUSED(methods);
 	UNUSED(clientinfo);
 #endif /* DNS_CLIENTINFO_VERSION */
-
+	UNUSED(source_ip);
+	UNUSED(type);
+	UNUSED(zone_data);
+	
 	if (strcmp(name, "@") == 0)
 		snprintf(filename, sizeof(filename), "%s", (char *)dbdata);
 	else
@@ -165,9 +168,10 @@ dirdb_create(const char *zone, int argc, char **argv,
  * The destroy() function frees the memory allocated by create().
  */
 static void
-dirdb_destroy(const char *zone, void *driverdata, void **dbdata) {
+dirdb_destroy(const char *zone, void *driverdata, void **dbdata, void *zone_data) {
 	UNUSED(zone);
 	UNUSED(driverdata);
+	UNUSED(zone_data);
 	isc_mem_free((isc_mem_t *)driverdata, *dbdata);
 }
 
@@ -179,7 +183,9 @@ static dns_sdbmethods_t dirdb_methods = {
 	dirdb_authority,
 	NULL, /* allnodes */
 	dirdb_create,
-	dirdb_destroy
+	dirdb_destroy,
+	NULL,	/* lookup2 */
+	NULL	/*zonedata for Intelligent DNS*/
 };
 
 /*

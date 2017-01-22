@@ -112,11 +112,11 @@ sqlitedb_lookup_cb(void *p, int cc, char **cv, char **cn)
 static isc_result_t
 sqlitedb_lookup(const char *zone, const char *name, void *dbdata,
 		dns_sdblookup_t *lookup, dns_clientinfomethods_t *methods,
-		dns_clientinfo_t *clientinfo)
+		dns_clientinfo_t *clientinfo,void *source_ip,dns_rdatatype_t type, void *zone_data)
 #else
 static isc_result_t
 sqlitedb_lookup(const char *zone, const char *name, void *dbdata,
-		dns_sdblookup_t *lookup)
+		dns_sdblookup_t *lookup,void *source_ip,dns_rdatatype_t type, void *zone_data)
 #endif /* DNS_CLIENTINFO_VERSION */
 /*
  * synchronous absolute name lookup
@@ -225,13 +225,14 @@ sqlitedb_allnodes(const char *zone,
 
 
 static void
-sqlitedb_destroy(const char *zone, void *driverdata, void **dbdata)
+sqlitedb_destroy(const char *zone, void *driverdata, void **dbdata, void *zone_data)
 {
     dbinfo_t *dbi = *dbdata;
 
     UNUSED(zone);
     UNUSED(driverdata);
-
+    UNUSED(zone_data);
+	
     if (dbi->db != NULL)
 	sqlite3_close(dbi->db);
     if (dbi->table != NULL)
@@ -306,7 +307,9 @@ static dns_sdbmethods_t sqlitedb_methods = {
     NULL, /* authority */
     sqlitedb_allnodes,
     sqlitedb_create,
-    sqlitedb_destroy
+    sqlitedb_destroy,
+    NULL,	/* lookup2 */
+    NULL	/*zonedata for Intelligent DNS*/
 };
 
 

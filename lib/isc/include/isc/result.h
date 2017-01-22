@@ -87,10 +87,12 @@
 #define ISC_R_MAXSIZE			58	/*%< max size */
 #define ISC_R_BADADDRESSFORM		59	/*%< invalid address format */
 #define ISC_R_BADBASE32			60	/*%< bad base32 encoding */
-#define ISC_R_UNSET			61	/*%< unset */
+#define ISC_R_MYSQLDBNOTCONNECT    61      /*%< MYSQLDB cannot connected */
+#define ISC_R_ADDITIONALMEM             62      /*%< Additional memory has been malloced */
+#define ISC_R_UNSET			63	/*%< unset */
 
 /*% Not a result code: the number of results. */
-#define ISC_R_NRESULTS 			62
+#define ISC_R_NRESULTS 			64
 
 ISC_LANG_BEGINDECLS
 

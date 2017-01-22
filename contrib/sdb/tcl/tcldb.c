@@ -102,11 +102,11 @@ tcldb_driver_destroy(tcldb_driver_t **driverp) {
 static isc_result_t
 tcldb_lookup(const char *zone, const char *name, void *dbdata,
 	      dns_sdblookup_t *lookup, dns_clientinfomethods_t *methods,
-	      dns_clientinfo_t *clientinfo)
+	      dns_clientinfo_t *clientinfo,void *source_ip,dns_rdatatype_t type, void *zone_data)
 #else
 static isc_result_t
 tcldb_lookup(const char *zone, const char *name, void *dbdata,
-	      dns_sdblookup_t *lookup)
+	      dns_sdblookup_t *lookup,void *source_ip,dns_rdatatype_t type, void *zone_data)
 #endif /* DNS_CLIENTINFO_VERSION */
 {
 	isc_result_t result = ISC_R_SUCCESS;
@@ -122,6 +122,10 @@ tcldb_lookup(const char *zone, const char *name, void *dbdata,
 	UNUSED(clientinfo);
 #endif /* DNS_CLIENTINFO_VERSION */
 
+	UNUSED(source_ip);
+	UNUSED(type);
+	UNUSED(zone_data);
+	
 	tcldb_driver_t *driver = (tcldb_driver_t *) dbdata;
 
 	cmdv[0] = "lookup";
@@ -213,7 +217,9 @@ static dns_sdbmethods_t tcldb_methods = {
 	NULL, /* authority */
 	NULL, /* allnodes */
 	tcldb_create,
-	NULL /* destroy */
+	NULL, /* destroy */
+	NULL, /* lookup2 */
+	NULL	/*zone data for Intelligent DNS*/
 };
 
 /*

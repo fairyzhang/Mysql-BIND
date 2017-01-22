@@ -97,6 +97,8 @@
 #define BACKTRACE_MAXFRAME 128
 #endif
 
+#include "include/mysqldb.h"
+
 static isc_boolean_t	want_stats = ISC_FALSE;
 static char		program_name[ISC_DIR_NAMEMAX] = "named";
 static char		absolute_conffile[ISC_DIR_PATHMAX];
@@ -912,7 +914,7 @@ setup(void) {
 		ns_main_earlyfatal("dlz_drivers_init() failed: %s",
 				   isc_result_totext(result));
 #endif
-
+	mysqldb_init();
 	ns_server_create(ns_g_mctx, &ns_g_server);
 }
 
@@ -922,6 +924,7 @@ cleanup(void) {
 
 	ns_server_destroy(&ns_g_server);
 
+	mysqldb_clear();
 	ns_builtin_deinit();
 
 	/*

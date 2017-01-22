@@ -32,6 +32,7 @@
 #include <isc/print.h>
 #include <isc/region.h>
 #include <isc/util.h>
+#include <isc/sockaddr.h>
 
 #include <dns/callbacks.h>
 #include <dns/db.h>
@@ -67,6 +68,8 @@ struct dns_sdb {
 	isc_mutex_t			lock;
 	/* Locked */
 	unsigned int			references;
+	/*Data tree for intelligent DNS*/
+	void				*zone_data;
 };
 
 struct dns_sdblookup {
@@ -560,7 +563,7 @@ destroy(dns_sdb_t *sdb) {
 	if (imp->methods->destroy != NULL) {
 		MAYBE_LOCK(sdb);
 		imp->methods->destroy(sdb->zone, imp->driverdata,
-				      &sdb->dbdata);
+				      &sdb->dbdata, sdb->zone_data);
 		MAYBE_UNLOCK(sdb);
 	}
 
@@ -730,7 +733,7 @@ destroynode(dns_sdbnode_t *node) {
 static isc_result_t
 findnodeext(dns_db_t *db, dns_name_t *name, isc_boolean_t create,
 	    dns_clientinfomethods_t *methods, dns_clientinfo_t *clientinfo,
-	    dns_dbnode_t **nodep)
+	    dns_dbnode_t **nodep, void *ip_info,dns_rdatatype_t type)
 {
 	dns_sdb_t *sdb = (dns_sdb_t *)db;
 	dns_sdbnode_t *node = NULL;
@@ -791,7 +794,7 @@ findnodeext(dns_db_t *db, dns_name_t *name, isc_boolean_t create,
 					       clientinfo);
 	else
 		result = imp->methods->lookup(sdb->zone, namestr, sdb->dbdata,
-					      node, methods, clientinfo);
+					      node, methods, clientinfo, ip_info,type,sdb->zone_data);
 	MAYBE_UNLOCK(sdb);
 	if (result != ISC_R_SUCCESS &&
 	    !(result == ISC_R_NOTFOUND &&
@@ -820,7 +823,7 @@ findext(dns_db_t *db, dns_name_t *name, dns_dbversion_t *version,
 	dns_rdatatype_t type, unsigned int options, isc_stdtime_t now,
 	dns_dbnode_t **nodep, dns_name_t *foundname,
 	dns_clientinfomethods_t *methods, dns_clientinfo_t *clientinfo,
-	dns_rdataset_t *rdataset, dns_rdataset_t *sigrdataset)
+	dns_rdataset_t *rdataset, dns_rdataset_t *sigrdataset, void *ip_info)
 {
 	dns_sdb_t *sdb = (dns_sdb_t *)db;
 	dns_dbnode_t *node = NULL;
@@ -856,19 +859,22 @@ findext(dns_db_t *db, dns_name_t *name, dns_dbversion_t *version,
 	flags = sdb->implementation->flags;
 	i = (flags & DNS_SDBFLAG_DNS64) != 0 ? nlabels : olabels;
 	for (; i <= nlabels; i++) {
+		i = nlabels;
 		/*
 		 * Look up the next label.
 		 */
 		dns_name_getlabelsequence(name, nlabels - i, i, xname);
 		result = findnodeext(db, xname, ISC_FALSE, methods,
-				     clientinfo, &node);
+				     clientinfo, &node, ip_info,type);
+		if(result  == ISC_R_MYSQLDBNOTCONNECT)
+            continue;
 		if (result == ISC_R_NOTFOUND) {
 			/*
 			 * No data at zone apex?
 			 */
 			if (i == olabels)
 				return (DNS_R_BADDB);
-			result = DNS_R_NXDOMAIN;
+			result = DNS_R_NXRRSET;
 			continue;
 		}
 		if (result != ISC_R_SUCCESS)
@@ -1257,6 +1263,46 @@ settask(dns_db_t *db, isc_task_t *task) {
 	UNUSED(task);
 }
 
+static isc_result_t
+zonedata_update(dns_db_t *db, dns_name_t *name){
+	dns_sdb_t *sdb = (dns_sdb_t *)db;
+	dns_sdbimplementation_t *imp = sdb->implementation;
+	isc_result_t result;
+	isc_buffer_t b;
+	char namestr[DNS_NAME_MAXTEXT + 1];
+	
+	REQUIRE(VALID_SDB(sdb));
+
+	if(sdb->zone_data == NULL)
+		return ISC_R_NOTFOUND;
+	
+	if(imp->methods->zdupdate == NULL)
+		return (ISC_R_NOTIMPLEMENTED);
+	
+	memset(namestr, '\0', sizeof(namestr));
+	if(name != NULL){
+		isc_buffer_init(&b, namestr, sizeof(namestr));
+		if ((imp->flags & DNS_SDBFLAG_RELATIVEOWNER) != 0) {
+			dns_name_t relname;
+			unsigned int labels;
+
+			labels = dns_name_countlabels(name) -
+				 dns_name_countlabels(&db->origin);
+			dns_name_init(&relname, NULL);
+			dns_name_getlabelsequence(name, 0, labels, &relname);
+			result = dns_name_totext(&relname, ISC_TRUE, &b);
+			if (result != ISC_R_SUCCESS)
+				return (result);
+		} else {
+			result = dns_name_totext(name, ISC_TRUE, &b);
+			if (result != ISC_R_SUCCESS)
+				return (result);
+		}
+		isc_buffer_putuint8(&b, 0);
+	}
+	result = imp->methods->zdupdate(sdb->zone, namestr, sdb->dbdata, &sdb->zone_data);
+	return result;
+}
 
 static dns_dbmethods_t sdb_methods = {
 	attach,
@@ -1298,7 +1344,8 @@ static dns_dbmethods_t sdb_methods = {
 	NULL,			/* rpz_enabled */
 	NULL,			/* rpz_findips */
 	findnodeext,
-	findext
+	findext,
+	zonedata_update
 };
 
 static isc_result_t
@@ -1368,10 +1415,21 @@ dns_sdb_create(isc_mem_t *mctx, dns_name_t *origin, dns_dbtype_t type,
 	sdb->common.magic = DNS_DB_MAGIC;
 	sdb->common.impmagic = SDB_MAGIC;
 
+	/*Data of intelligent DNS*/
+       sdb->zone_data = NULL;
+       if(imp->methods->zonedata != NULL){
+               result = imp->methods->zonedata(zonestr, sdb->dbdata, &sdb->zone_data);
+               if(result != ISC_R_SUCCESS)
+                       goto cleanup_destroy;
+       }
+	   
 	*dbp = (dns_db_t *)sdb;
 
 	return (ISC_R_SUCCESS);
 
+cleanup_destroy:
+       imp->methods->destroy(sdb->zone, imp->driverdata,
+                                     &sdb->dbdata, sdb->zone_data);
  cleanup_zonestr:
 	isc_mem_free(mctx, sdb->zone);
  cleanup_origin:
@@ -1427,7 +1485,8 @@ static dns_rdatasetmethods_t methods = {
 	NULL,
 	NULL,
 	NULL,
-	NULL
+	NULL,
+	zonedata_update
 };
 
 static void

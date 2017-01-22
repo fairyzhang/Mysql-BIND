@@ -480,10 +480,10 @@ dns_db_findnode(dns_db_t *db, dns_name_t *name,
 	REQUIRE(nodep != NULL && *nodep == NULL);
 
 	if (db->methods->findnode != NULL)
-		return ((db->methods->findnode)(db, name, create, nodep));
+		return ((db->methods->findnode)(db, name, create, nodep,NULL,0));
 	else
 		return ((db->methods->findnodeext)(db, name, create,
-						   NULL, NULL, nodep));
+						   NULL, NULL, nodep,NULL,0));
 }
 
 isc_result_t
@@ -501,9 +501,9 @@ dns_db_findnodeext(dns_db_t *db, dns_name_t *name,
 
 	if (db->methods->findnodeext != NULL)
 		return ((db->methods->findnodeext)(db, name, create,
-						   methods, clientinfo, nodep));
+						   methods, clientinfo, nodep,NULL,0));
 	else
-		return ((db->methods->findnode)(db, name, create, nodep));
+		return ((db->methods->findnode)(db, name, create, nodep,NULL,0));
 }
 
 isc_result_t
@@ -525,7 +525,7 @@ isc_result_t
 dns_db_find(dns_db_t *db, dns_name_t *name, dns_dbversion_t *version,
 	    dns_rdatatype_t type, unsigned int options, isc_stdtime_t now,
 	    dns_dbnode_t **nodep, dns_name_t *foundname,
-	    dns_rdataset_t *rdataset, dns_rdataset_t *sigrdataset)
+	    dns_rdataset_t *rdataset, dns_rdataset_t *sigrdataset, void  *ip_info)
 {
 	/*
 	 * Find the best match for 'name' and 'type' in version 'version'
@@ -546,12 +546,12 @@ dns_db_find(dns_db_t *db, dns_name_t *name, dns_dbversion_t *version,
 	if (db->methods->find != NULL)
 		return ((db->methods->find)(db, name, version, type,
 					    options, now, nodep, foundname,
-					    rdataset, sigrdataset));
+					    rdataset, sigrdataset, ip_info));
 	else
 		return ((db->methods->findext)(db, name, version, type,
 					       options, now, nodep, foundname,
 					       NULL, NULL,
-					       rdataset, sigrdataset));
+					       rdataset, sigrdataset, ip_info));
 }
 
 isc_result_t
@@ -559,7 +559,7 @@ dns_db_findext(dns_db_t *db, dns_name_t *name, dns_dbversion_t *version,
 	       dns_rdatatype_t type, unsigned int options, isc_stdtime_t now,
 	       dns_dbnode_t **nodep, dns_name_t *foundname,
 	       dns_clientinfomethods_t *methods, dns_clientinfo_t *clientinfo,
-	       dns_rdataset_t *rdataset, dns_rdataset_t *sigrdataset)
+	       dns_rdataset_t *rdataset, dns_rdataset_t *sigrdataset, void  *ip_info)
 {
 
 	/*
@@ -582,11 +582,11 @@ dns_db_findext(dns_db_t *db, dns_name_t *name, dns_dbversion_t *version,
 		return ((db->methods->findext)(db, name, version, type,
 					       options, now, nodep, foundname,
 					       methods, clientinfo,
-					       rdataset, sigrdataset));
+					       rdataset, sigrdataset, ip_info));
 	else
 		return ((db->methods->find)(db, name, version, type,
 					    options, now, nodep, foundname,
-					    rdataset, sigrdataset));
+					    rdataset, sigrdataset, ip_info));
 }
 
 isc_result_t
@@ -1023,4 +1023,13 @@ dns_db_rpz_findips(dns_rpz_zone_t *rpz, dns_rpz_type_t rpz_type,
 	if (db->methods->rpz_findips != NULL)
 		(db->methods->rpz_findips)(rpz, rpz_type, zone, db, version,
 					   ardataset, st, query_qname);
+}
+
+isc_result_t
+dns_db_update(dns_db_t *db, dns_name_t *name){
+	REQUIRE(DNS_DB_VALID(db));
+	REQUIRE(dns_db_iszone(db) == ISC_TRUE);
+	if (db->methods->update != NULL)
+		return ((db->methods->update)(db,name));
+	return ISC_R_NOTIMPLEMENTED;
 }

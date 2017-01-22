@@ -540,7 +540,7 @@ destroynode(dns_sdlznode_t *node) {
 static isc_result_t
 findnodeext(dns_db_t *db, dns_name_t *name, isc_boolean_t create,
 	    dns_clientinfomethods_t *methods, dns_clientinfo_t *clientinfo,
-	    dns_dbnode_t **nodep)
+	    dns_dbnode_t **nodep,void *ip_info,dns_rdatatype_t type)
 {
 	dns_sdlz_db_t *sdlz = (dns_sdlz_db_t *)db;
 	dns_sdlznode_t *node = NULL;
@@ -655,9 +655,9 @@ findnodeext(dns_db_t *db, dns_name_t *name, isc_boolean_t create,
 
 static isc_result_t
 findnode(dns_db_t *db, dns_name_t *name, isc_boolean_t create,
-	 dns_dbnode_t **nodep)
+	 dns_dbnode_t **nodep, void *ip_info, dns_rdatatype_t type)
 {
-	return (findnodeext(db, name, create, NULL, NULL, nodep));
+	return (findnodeext(db, name, create, NULL, NULL, nodep, ip_info, type));
 }
 
 static isc_result_t
@@ -838,7 +838,7 @@ findext(dns_db_t *db, dns_name_t *name, dns_dbversion_t *version,
 	dns_rdatatype_t type, unsigned int options, isc_stdtime_t now,
 	dns_dbnode_t **nodep, dns_name_t *foundname,
 	dns_clientinfomethods_t *methods, dns_clientinfo_t *clientinfo,
-	dns_rdataset_t *rdataset, dns_rdataset_t *sigrdataset)
+	dns_rdataset_t *rdataset, dns_rdataset_t *sigrdataset, void *ip_info)
 {
 	dns_sdlz_db_t *sdlz = (dns_sdlz_db_t *)db;
 	dns_dbnode_t *node = NULL;
@@ -878,7 +878,7 @@ findext(dns_db_t *db, dns_name_t *name, dns_dbversion_t *version,
 		 */
 		dns_name_getlabelsequence(name, nlabels - i, i, xname);
 		result = findnodeext(db, xname, ISC_FALSE,
-				     methods, clientinfo, &node);
+				     methods, clientinfo, &node,ip_info,type);
 		if (result != ISC_R_SUCCESS) {
 			result = DNS_R_NXDOMAIN;
 			continue;
@@ -994,10 +994,10 @@ static isc_result_t
 find(dns_db_t *db, dns_name_t *name, dns_dbversion_t *version,
      dns_rdatatype_t type, unsigned int options, isc_stdtime_t now,
      dns_dbnode_t **nodep, dns_name_t *foundname,
-     dns_rdataset_t *rdataset, dns_rdataset_t *sigrdataset)
+     dns_rdataset_t *rdataset, dns_rdataset_t *sigrdataset, void *ip_info)
 {
 	return (findext(db, name, version, type, options, now, nodep,
-			foundname, NULL, NULL, rdataset, sigrdataset));
+			foundname, NULL, NULL, rdataset, sigrdataset, ip_info));
 }
 
 static isc_result_t
@@ -1216,7 +1216,7 @@ getoriginnode(dns_db_t *db, dns_dbnode_t **nodep) {
 		return (ISC_R_NOTIMPLEMENTED);
 
 	result = findnodeext(db, &sdlz->common.origin, ISC_FALSE,
-			     NULL, NULL, nodep);
+			     NULL, NULL, nodep, NULL, 0);
 	if (result != ISC_R_SUCCESS)
 		sdlz_log(ISC_LOG_ERROR, "sdlz getoriginnode failed : %s",
 			 isc_result_totext(result));
@@ -1263,7 +1263,8 @@ static dns_dbmethods_t sdlzdb_methods = {
 	NULL,			/* rpz_enabled */
 	NULL,			/* rpz_findips */
 	findnodeext,
-	findext
+	findext,
+	NULL			/* update */
 };
 
 /*
@@ -1412,7 +1413,8 @@ static dns_rdatasetmethods_t rdataset_methods = {
 	NULL,
 	NULL,
 	NULL,
-	NULL
+	NULL,
+	NULL	/* update */
 };
 
 static void

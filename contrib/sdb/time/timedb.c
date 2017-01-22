@@ -51,11 +51,11 @@ static dns_sdbimplementation_t *timedb = NULL;
 static isc_result_t
 timedb_lookup(const char *zone, const char *name, void *dbdata,
 	      dns_sdblookup_t *lookup, dns_clientinfomethods_t *methods,
-	      dns_clientinfo_t *clientinfo)
+	      dns_clientinfo_t *clientinfo,void *source_ip,dns_rdatatype_t type, void *zone_data)
 #else
 static isc_result_t
 timedb_lookup(const char *zone, const char *name, void *dbdata,
-	      dns_sdblookup_t *lookup)
+	      dns_sdblookup_t *lookup,void *source_ip,dns_rdatatype_t type, void *zone_data)
 #endif /* DNS_CLIENTINFO_VERSION */
 {
 	isc_result_t result;
@@ -67,6 +67,10 @@ timedb_lookup(const char *zone, const char *name, void *dbdata,
 	UNUSED(clientinfo);
 #endif /* DNS_CLIENTINFO_VERSION */
 
+	UNUSED(source_ip);
+	UNUSED(type);
+	UNUSED(zone_data);
+	
 	if (strcmp(name, "@") == 0 || strcmp(name, "time") == 0) {
 		time_t now = time(NULL);
 		char buf[100];
@@ -130,7 +134,9 @@ static dns_sdbmethods_t timedb_methods = {
 	timedb_authority,
 	NULL,	/* allnodes */
 	NULL,	/* create */
-	NULL	/* destroy */
+	NULL,	/* destroy */
+	NULL,	/* lookup2 */
+	NULL	/*zone data for Intelligent DNS*/
 };
 
 /*

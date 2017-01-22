@@ -317,6 +317,12 @@ isc__app_start(void) {
 	result = handle_signal(SIGHUP, SIG_DFL);
 	if (result != ISC_R_SUCCESS)
 		return (result);
+	/*
+	 * Adding for intelligent DNS using USER1 signal.
+	 */
+	result = handle_signal(SIGUSR1, SIG_DFL);
+	if (result != ISC_R_SUCCESS)
+		return (result);
 
 #ifdef HAVE_SIGWAIT
 	result = handle_signal(SIGTERM, SIG_DFL);
@@ -337,8 +343,13 @@ isc__app_start(void) {
 	 * blocked by default, ensuring that only the thread that calls
 	 * sigwait() for them will get those signals.
 	 */
+
+   /*
+	 * Also block SIGUSR1 for intelligent DNS.
+	 */
 	if (sigemptyset(&sset) != 0 ||
 	    sigaddset(&sset, SIGHUP) != 0 ||
+	    sigaddset(&sset, SIGUSR1) != 0 ||
 	    sigaddset(&sset, SIGINT) != 0 ||
 	    sigaddset(&sset, SIGTERM) != 0) {
 		isc__strerror(errno, strbuf, sizeof(strbuf));
@@ -364,6 +375,7 @@ isc__app_start(void) {
 	 */
 	if (sigemptyset(&sset) != 0 ||
 	    sigaddset(&sset, SIGHUP) != 0 ||
+	    sigaddset(&sset, SIGUSR1) != 0 ||
 	    sigaddset(&sset, SIGINT) != 0 ||
 	    sigaddset(&sset, SIGTERM) != 0) {
 		isc__strerror(errno, strbuf, sizeof(strbuf));
@@ -616,6 +628,10 @@ isc__app_ctxrun(isc_appctx_t *ctx0) {
 		result = handle_signal(SIGHUP, reload_action);
 		if (result != ISC_R_SUCCESS)
 			return (ISC_R_SUCCESS);
+		/*Add for intelligent DNS to reload using USR1 signal*/
+		result = handle_signal(SIGUSR1, reload_action);
+		if (result != ISC_R_SUCCESS)
+			return (ISC_R_SUCCESS);
 	}
 #endif
 
@@ -637,8 +653,12 @@ isc__app_ctxrun(isc_appctx_t *ctx0) {
 		/*
 		 * Wait for SIGHUP, SIGINT, or SIGTERM.
 		 */
+		 /*
+		  * Also waiting for SIGUSR1
+		  */
 		if (sigemptyset(&sset) != 0 ||
 		    sigaddset(&sset, SIGHUP) != 0 ||
+		    sigaddset(&sset, SIGUSR1) != 0 ||
 		    sigaddset(&sset, SIGINT) != 0 ||
 		    sigaddset(&sset, SIGTERM) != 0) {
 			isc__strerror(errno, strbuf, sizeof(strbuf));
@@ -652,7 +672,7 @@ isc__app_ctxrun(isc_appctx_t *ctx0) {
 		if (result == 0) {
 			if (sig == SIGINT || sig == SIGTERM)
 				ctx->want_shutdown = ISC_TRUE;
-			else if (sig == SIGHUP)
+			else if (sig == SIGHUP || sig == SIGUSR1)
 				ctx->want_reload = ISC_TRUE;
 		}
 
@@ -661,7 +681,7 @@ isc__app_ctxrun(isc_appctx_t *ctx0) {
 		if (sig >= 0) {
 			if (sig == SIGINT || sig == SIGTERM)
 				ctx->want_shutdown = ISC_TRUE;
-			else if (sig == SIGHUP)
+			else if (sig == SIGHUP || sig == SIGUSR1)
 				ctx->want_reload = ISC_TRUE;
 		}
 
@@ -798,8 +818,30 @@ isc__app_ctxsuspend(isc_appctx_t *ctx0) {
 						 strbuf);
 				return (ISC_R_UNEXPECTED);
 			}
+			/*
+            * Add user1 signal for intelligent DNS.
+			 */
+			result = pthread_kill(main_thread, SIGUSR1);
+			if (result != 0) {
+				isc__strerror(result, strbuf, sizeof(strbuf));
+				UNEXPECTED_ERROR(__FILE__, __LINE__,
+						 "isc_app_reload() "
+						 "pthread_kill: %s",
+						 strbuf);
+				return (ISC_R_UNEXPECTED);
+			}
 #else
 			if (kill(getpid(), SIGHUP) < 0) {
+				isc__strerror(errno, strbuf, sizeof(strbuf));
+				UNEXPECTED_ERROR(__FILE__, __LINE__,
+						 "isc_app_reload() "
+						 "kill: %s", strbuf);
+				return (ISC_R_UNEXPECTED);
+			}
+			/*
+ 			 * Add user1 signal for intelligent DNS.
+			 */
+			if (kill(getpid(), SIGUSR1) < 0) {
 				isc__strerror(errno, strbuf, sizeof(strbuf));
 				UNEXPECTED_ERROR(__FILE__, __LINE__,
 						 "isc_app_reload() "

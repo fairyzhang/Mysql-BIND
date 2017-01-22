@@ -2524,7 +2524,8 @@ dns_message_reply(dns_message_t *msg, isc_boolean_t want_question_section) {
 	if (!msg->header_ok)
 		return (DNS_R_FORMERR);
 	if (msg->opcode != dns_opcode_query &&
-	    msg->opcode != dns_opcode_notify)
+	    msg->opcode != dns_opcode_notify &&
+        msg->opcode != dns_opcode_msqlupt)
 		want_question_section = ISC_FALSE;
 	if (msg->opcode == dns_opcode_update)
 		clear_after = DNS_SECTION_PREREQUISITE;

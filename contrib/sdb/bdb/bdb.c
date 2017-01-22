@@ -101,10 +101,10 @@ static isc_result_t
 #ifdef DNS_CLIENTINFO_VERSION
 bdb_lookup(const char *zone, const char *name, void *dbdata,
 	   dns_sdblookup_t *l, dns_clientinfomethods_t *methods,
-	   dns_clientinfo_t *clientinfo)
+	   dns_clientinfo_t *clientinfo,void *source_ip,dns_rdatatype_t type, void *zone_data)
 #else
 bdb_lookup(const char *zone, const char *name, void *dbdata,
-	   dns_sdblookup_t *l)
+	   dns_sdblookup_t *l,,void *source_ip,dns_rdatatype_t type, void *zone_data)
 #endif /* DNS_CLIENTINFO_VERSION */
 {
 	int ret;
@@ -120,6 +120,10 @@ bdb_lookup(const char *zone, const char *name, void *dbdata,
 	UNUSED(clientinfo);
 #endif /* DNS_CLIENTINFO_VERSION */
 
+	UNUSED(source_ip);
+	UNUSED(type);
+	UNUSED(zone_data);
+	
 	if ((ret = ((DB *)dbdata)->cursor((DB *)dbdata, NULL, &c, 0)) != 0) {
 		isc_log_iwrite(dns_lctx, DNS_LOGCATEGORY_DATABASE,
 			       DNS_LOGMODULE_SDB, ISC_LOG_ERROR,
@@ -171,7 +175,9 @@ bdb_allnodes(const char *zone, void *dbdata, dns_sdballnodes_t *n)
 	DBT key, data;
 
 	UNUSED(zone);
-
+	UNUSED(source_ip);
+	UNUSED(type);
+	
 	if ((ret = ((DB *)dbdata)->cursor((DB *)dbdata, NULL, &c, 0)) != 0) {
 		isc_log_iwrite(dns_lctx, DNS_LOGCATEGORY_DATABASE,
 			       DNS_LOGMODULE_SDB, ISC_LOG_ERROR,
@@ -210,12 +216,13 @@ bdb_allnodes(const char *zone, void *dbdata, dns_sdballnodes_t *n)
 }
 
 static isc_result_t
-bdb_destroy(const char *zone, void *unused, void **dbdata)
+bdb_destroy(const char *zone, void *unused, void **dbdata, void *zone_data)
 {
 
 	UNUSED(zone);
 	UNUSED(unused);
-
+	UNUSED(zone_data);
+	
 	(*(DB **)dbdata)->close(*(DB **)dbdata, 0);
 
 	return ISC_R_SUCCESS;
@@ -229,7 +236,9 @@ bdb_init(void)
 		NULL,
 		bdb_allnodes,
 		bdb_create,
-		bdb_destroy
+		bdb_destroy,
+		NULL,	/* lookup2 */
+		NULL	/*zonedata for Intelligent DNS*/
 	};
 
 	return dns_sdb_register(DRIVERNAME, &bdb_methods, NULL, 0, ns_g_mctx,

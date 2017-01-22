@@ -779,7 +779,7 @@ main(int argc, char *argv[]) {
 		} else {
 			result = dns_db_find(db, &name, version, type,
 					     options, 0, &node, fname,
-					     &rdataset, &sigrdataset);
+					     &rdataset, &sigrdataset, NULL);
 		}
 
 		if (!quiet) {

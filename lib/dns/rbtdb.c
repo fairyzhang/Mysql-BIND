@@ -2586,12 +2586,14 @@ findnodeintree(dns_rbtdb_t *rbtdb, dns_rbt_t *tree, dns_name_t *name,
 
 static isc_result_t
 findnode(dns_db_t *db, dns_name_t *name, isc_boolean_t create,
-	 dns_dbnode_t **nodep)
+	 dns_dbnode_t **nodep,void *ip_info,dns_rdatatype_t type)
 {
 	dns_rbtdb_t *rbtdb = (dns_rbtdb_t *)db;
 
 	REQUIRE(VALID_RBTDB(rbtdb));
-
+	UNUSED(ip_info);
+	UNUSED(type);
+	
 	return (findnodeintree(rbtdb, rbtdb->tree, name, create, nodep));
 }
 
@@ -3611,7 +3613,7 @@ static isc_result_t
 zone_find(dns_db_t *db, dns_name_t *name, dns_dbversion_t *version,
 	  dns_rdatatype_t type, unsigned int options, isc_stdtime_t now,
 	  dns_dbnode_t **nodep, dns_name_t *foundname,
-	  dns_rdataset_t *rdataset, dns_rdataset_t *sigrdataset)
+	  dns_rdataset_t *rdataset, dns_rdataset_t *sigrdataset, void *ip_info)
 {
 	dns_rbtnode_t *node = NULL;
 	isc_result_t result;
@@ -3640,6 +3642,7 @@ zone_find(dns_db_t *db, dns_name_t *name, dns_dbversion_t *version,
 	 * We don't care about 'now'.
 	 */
 	UNUSED(now);
+	UNUSED(ip_info);
 
 	/*
 	 * If the caller didn't supply a version, attach to the current
@@ -7454,7 +7457,8 @@ static dns_dbmethods_t zone_methods = {
 	NULL,
 #endif
 	NULL,
-	NULL
+	NULL,
+	NULL	/* update */
 };
 
 static dns_dbmethods_t cache_methods = {
@@ -7497,7 +7501,8 @@ static dns_dbmethods_t cache_methods = {
 	NULL,
 	NULL,
 	NULL,
-	NULL
+	NULL,
+	NULL 	/* update */
 };
 
 isc_result_t

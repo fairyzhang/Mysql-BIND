@@ -61,7 +61,7 @@ typedef isc_result_t
 (*dns_sdblookupfunc_t)(const char *zone, const char *name, void *dbdata,
 		       dns_sdblookup_t *lookup,
 		       dns_clientinfomethods_t *methods,
-		       dns_clientinfo_t *clientinfo);
+		       dns_clientinfo_t *clientinfo,void *ip_info,dns_rdatatype_t type, void *zone_data);
 typedef isc_result_t
 (*dns_sdblookup2func_t)(const dns_name_t *zone, const dns_name_t *name,
 			void *dbdata, dns_sdblookup_t *lookup,
@@ -80,8 +80,15 @@ typedef isc_result_t
 		       void *driverdata, void **dbdata);
 
 typedef void
-(*dns_sdbdestroyfunc_t)(const char *zone, void *driverdata, void **dbdata);
+(*dns_sdbdestroyfunc_t)(const char *zone, void *driverdata, void **dbdata, void *zone_data);
 
+/*Caching zone data info for Intelligent DNS */
+typedef isc_result_t
+(*dns_sdbzonedatafunc_t)(const char *zone, void *driverdata, void **zone_data);
+
+/*Caching zone data info for Intelligent DNS */
+typedef isc_result_t
+(*dns_sdbzdupdatefunc_t)(const char *zone, const char *name, void *driverdata, void **zone_data);
 
 typedef struct dns_sdbmethods {
 	dns_sdblookupfunc_t	lookup;
@@ -90,6 +97,8 @@ typedef struct dns_sdbmethods {
 	dns_sdbcreatefunc_t	create;
 	dns_sdbdestroyfunc_t	destroy;
 	dns_sdblookup2func_t	lookup2;
+	dns_sdbzonedatafunc_t zonedata;
+	dns_sdbzdupdatefunc_t zdupdate;
 } dns_sdbmethods_t;
 
 /***

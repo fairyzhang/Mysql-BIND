@@ -384,15 +384,23 @@ ldapdb_search(const char *zone, const char *name, void *dbdata, void *retdata,
 static isc_result_t
 ldapdb_lookup(const char *zone, const char *name, void *dbdata,
 	      dns_sdblookup_t *lookup, dns_clientinfomethods_t *methods,
-	      dns_clientinfo_t *clientinfo)
+	      dns_clientinfo_t *clientinfo,void *source_ip,dns_rdatatype_t type, void *zone_data)
 {
+	UNUSED(source_ip);
+	UNUSED(type);
+	UNUSED(zone_data);
+	
 	return (ldapdb_search(zone, name, dbdata, lookup, NULL, NULL));
 }
 #else
 static isc_result_t
 ldapdb_lookup(const char *zone, const char *name, void *dbdata,
-	      dns_sdblookup_t *lookup)
+	      dns_sdblookup_t *lookup,void *source_ip,dns_rdatatype_t type, void *zone_data)
 {
+	UNUSED(source_ip);
+	UNUSED(type);
+	UNUSED(zone_data);
+	
 	return (ldapdb_search(zone, name, dbdata, lookup, methods,
 			      clientinfo));
 }
@@ -647,12 +655,13 @@ ldapdb_create(const char *zone, int argc, char **argv,
 }
 
 static void
-ldapdb_destroy(const char *zone, void *driverdata, void **dbdata) {
+ldapdb_destroy(const char *zone, void *driverdata, void **dbdata, void *zone_data) {
 	struct ldapdb_data *data = *dbdata;
 	
         UNUSED(zone);
         UNUSED(driverdata);
-
+	UNUSED(zone_data);
+	
 	free_data(data);
 }
 
@@ -661,7 +670,9 @@ static dns_sdbmethods_t ldapdb_methods = {
 	NULL, /* authority */
 	ldapdb_allnodes,
 	ldapdb_create,
-	ldapdb_destroy
+	ldapdb_destroy,
+	NULL,	/* lookup2 */
+	NULL	/*zonedata for Intelligent DNS*/
 };
 
 /* Wrapper around dns_sdb_register() */

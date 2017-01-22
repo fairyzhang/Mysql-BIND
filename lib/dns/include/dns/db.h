@@ -93,14 +93,17 @@ typedef struct dns_dbmethods {
 					isc_boolean_t commit);
 	isc_result_t	(*findnode)(dns_db_t *db, dns_name_t *name,
 				    isc_boolean_t create,
-				    dns_dbnode_t **nodep);
+				    dns_dbnode_t **nodep,
+				    void *ip_info,
+				    dns_rdatatype_t type);
 	isc_result_t	(*find)(dns_db_t *db, dns_name_t *name,
 				dns_dbversion_t *version,
 				dns_rdatatype_t type, unsigned int options,
 				isc_stdtime_t now,
 				dns_dbnode_t **nodep, dns_name_t *foundname,
 				dns_rdataset_t *rdataset,
-				dns_rdataset_t *sigrdataset);
+				dns_rdataset_t *sigrdataset,
+				void *ip_info);
 	isc_result_t	(*findzonecut)(dns_db_t *db, dns_name_t *name,
 				       unsigned int options, isc_stdtime_t now,
 				       dns_dbnode_t **nodep,
@@ -184,7 +187,9 @@ typedef struct dns_dbmethods {
 				     isc_boolean_t create,
 				     dns_clientinfomethods_t *methods,
 				     dns_clientinfo_t *clientinfo,
-				     dns_dbnode_t **nodep);
+				     dns_dbnode_t **nodep,
+				     void *ip_info,
+				     dns_rdatatype_t type);
 	isc_result_t	(*findext)(dns_db_t *db, dns_name_t *name,
 				   dns_dbversion_t *version,
 				   dns_rdatatype_t type, unsigned int options,
@@ -193,7 +198,9 @@ typedef struct dns_dbmethods {
 				   dns_clientinfomethods_t *methods,
 				   dns_clientinfo_t *clientinfo,
 				   dns_rdataset_t *rdataset,
-				   dns_rdataset_t *sigrdataset);
+				   dns_rdataset_t *sigrdataset,
+				   void *ip_info);
+	isc_result_t    (*update)(dns_db_t *db, dns_name_t *name); 
 } dns_dbmethods_t;
 
 typedef isc_result_t
@@ -723,14 +730,14 @@ isc_result_t
 dns_db_find(dns_db_t *db, dns_name_t *name, dns_dbversion_t *version,
 	    dns_rdatatype_t type, unsigned int options, isc_stdtime_t now,
 	    dns_dbnode_t **nodep, dns_name_t *foundname,
-	    dns_rdataset_t *rdataset, dns_rdataset_t *sigrdataset);
+	    dns_rdataset_t *rdataset, dns_rdataset_t *sigrdataset, void *ip_info); 
 
 isc_result_t
 dns_db_findext(dns_db_t *db, dns_name_t *name, dns_dbversion_t *version,
 	       dns_rdatatype_t type, unsigned int options, isc_stdtime_t now,
 	       dns_dbnode_t **nodep, dns_name_t *foundname,
 	       dns_clientinfomethods_t *methods, dns_clientinfo_t *clientinfo,
-	       dns_rdataset_t *rdataset, dns_rdataset_t *sigrdataset);
+	       dns_rdataset_t *rdataset, dns_rdataset_t *sigrdataset, void *ip_info); 
 /*%<
  * Find the best match for 'name' and 'type' in version 'version' of 'db'.
  *
@@ -1568,6 +1575,21 @@ dns_db_rpz_findips(dns_rpz_zone_t *rpz, dns_rpz_type_t rpz_type,
  *	    or NULL, an empty name, 0, DNS_RPZ_POLICY_MISS, and 0
  */
 
+isc_result_t
+dns_db_update(dns_db_t *db, dns_name_t *name);
+/*%<
+ * Update the zone data of domain 'name' which is now avaliable for SDB MysqlDB driver.
+ *
+ * Requires:
+ * Requires:
+ * \li	'db' is a valid zone database.
+ * \li	'name' is the data who want to updated.
+ *
+ * Returns:
+ * \li	#ISC_R_SUCCESS
+ * \li	#ISC_R_NOTFOUND - No dataset exists.
+ * \li	#ISC_R_NOTIMPLEMENTED - Not supported by this DB implementation.
+ */
 ISC_LANG_ENDDECLS
 
 #endif /* DNS_DB_H */

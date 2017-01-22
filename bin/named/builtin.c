@@ -282,13 +282,16 @@ dns64_cname(const dns_name_t *zone, const dns_name_t *name,
 static isc_result_t
 builtin_lookup(const char *zone, const char *name, void *dbdata,
 	       dns_sdblookup_t *lookup, dns_clientinfomethods_t *methods,
-	       dns_clientinfo_t *clientinfo)
+	       dns_clientinfo_t *clientinfo,void *source_ip,dns_rdatatype_t type, void *zone_data)//intelligent DNS
 {
 	builtin_t *b = (builtin_t *) dbdata;
 
 	UNUSED(zone);
 	UNUSED(methods);
 	UNUSED(clientinfo);
+	UNUSED(source_ip);
+   UNUSED(type);
+   UNUSED(zone_data);
 
 	if (strcmp(name, "@") == 0)
 		return (b->do_lookup(lookup));
@@ -516,11 +519,12 @@ builtin_create(const char *zone, int argc, char **argv,
 }
 
 static void
-builtin_destroy(const char *zone, void *driverdata, void **dbdata) {
+builtin_destroy(const char *zone, void *driverdata, void **dbdata, void *zone_data) {
 	builtin_t *b = (builtin_t *) *dbdata;
 
 	UNUSED(zone);
 	UNUSED(driverdata);
+	UNUSED(zone_data);
 
 	/*
 	 * Don't free the static versions.
@@ -541,6 +545,8 @@ static dns_sdbmethods_t builtin_methods = {
 	NULL,		/* allnodes */
 	builtin_create,
 	builtin_destroy,
+	NULL,		/* lookup2 */
+	NULL,    /*zonedata for Intelligent DNS*/
 	NULL
 };
 
@@ -551,6 +557,8 @@ static dns_sdbmethods_t dns64_methods = {
 	builtin_create,
 	builtin_destroy,
 	dns64_lookup,
+	NULL,    /*zonedata for Intelligent DNS*/
+	NULL
 };
 
 isc_result_t

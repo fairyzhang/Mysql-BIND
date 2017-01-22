@@ -28,10 +28,10 @@ top_srcdir =	@top_srcdir@
 #
 # Add database drivers here.
 #
-DBDRIVER_OBJS =
-DBDRIVER_SRCS =
-DBDRIVER_INCLUDES =
-DBDRIVER_LIBS =
+DBDRIVER_OBJS = mysqldb.@O@
+DBDRIVER_SRCS = mysqldb.c
+DBDRIVER_INCLUDES = -I/usr/include/mysql  -g -pipe -Wp,-D_FORTIFY_SOURCE=2 -fexceptions -fstack-protector --param=ssp-buffer-size=4 -m64 -D_GNU_SOURCE -D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE -fno-strict-aliasing -fwrapv -fPIC   -DUNIV_LINUX -DUNIV_LINUX
+DBDRIVER_LIBS = -rdynamic -L/usr/lib64/mysql -lmysqlclient -lz -lcrypt -lnsl -lm -lssl -lcrypto
 
 DLZ_DRIVER_DIR =	${top_srcdir}/contrib/dlz/drivers
 
@@ -86,7 +86,7 @@ OBJS =		builtin.@O@ client.@O@ config.@O@ control.@O@ \
 		tkeyconf.@O@ tsigconf.@O@ update.@O@ xfrout.@O@ \
 		zoneconf.@O@ \
 		lwaddr.@O@ lwresd.@O@ lwdclient.@O@ lwderror.@O@ lwdgabn.@O@ \
-		lwdgnba.@O@ lwdgrbn.@O@ lwdnoop.@O@ lwsearch.@O@ \
+		lwdgnba.@O@ lwdgrbn.@O@ lwdnoop.@O@ lwsearch.@O@ msqlupt.@O@ \
 		${DLZDRIVER_OBJS} ${DBDRIVER_OBJS}
 
 UOBJS =		unix/os.@O@ unix/dlz_dlopen_driver.@O@
@@ -100,7 +100,7 @@ SRCS =		builtin.c client.c config.c control.c \
 		tkeyconf.c tsigconf.c update.c xfrout.c \
 		zoneconf.c \
 		lwaddr.c lwresd.c lwdclient.c lwderror.c lwdgabn.c \
-		lwdgnba.c lwdgrbn.c lwdnoop.c lwsearch.c \
+		lwdgnba.c lwdgrbn.c lwdnoop.c lwsearch.c msqlupt.c \
 		${DLZDRIVER_SRCS} ${DBDRIVER_SRCS}
 
 MANPAGES =	named.8 lwresd.8 named.conf.5

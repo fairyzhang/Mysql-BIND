@@ -54,6 +54,7 @@
 #define NS_LOGMODULE_NOTIFY		(&ns_g_modules[8])
 #define NS_LOGMODULE_CONTROL		(&ns_g_modules[9])
 #define NS_LOGMODULE_LWRESD		(&ns_g_modules[10])
+#define NS_LOGMODULE_MSQLUPT		(&ns_g_modules[11])
 
 isc_result_t
 ns_log_init(isc_boolean_t safe);

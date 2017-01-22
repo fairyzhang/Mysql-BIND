@@ -289,7 +289,7 @@ static isc_result_t
 find(dns_db_t *db, dns_name_t *name, dns_dbversion_t *version,
     dns_rdatatype_t type, unsigned int options, isc_stdtime_t now,
     dns_dbnode_t **nodep, dns_name_t *foundname, dns_rdataset_t *rdataset,
-    dns_rdataset_t *sigrdataset)
+    dns_rdataset_t *sigrdataset, void *ip_info)
 {
 	dns_ecdb_t *ecdb = (dns_ecdb_t *)db;
 
@@ -304,7 +304,8 @@ find(dns_db_t *db, dns_name_t *name, dns_dbversion_t *version,
 	UNUSED(foundname);
 	UNUSED(rdataset);
 	UNUSED(sigrdataset);
-
+	UNUSED(ip_info);
+	
 	return (ISC_R_NOTFOUND);
 }
 
@@ -331,7 +332,7 @@ findzonecut(dns_db_t *db, dns_name_t *name,
 
 static isc_result_t
 findnode(dns_db_t *db, dns_name_t *name, isc_boolean_t create,
-	 dns_dbnode_t **nodep)
+	 dns_dbnode_t **nodep, void *ip_info, dns_rdatatype_t type)
 {
 	dns_ecdb_t *ecdb = (dns_ecdb_t *)db;
 	isc_mem_t *mctx;
@@ -342,6 +343,8 @@ findnode(dns_db_t *db, dns_name_t *name, isc_boolean_t create,
 	REQUIRE(nodep != NULL && *nodep == NULL);
 
 	UNUSED(name);
+    UNUSED(ip_info);
+    UNUSED(type);
 
 	if (create != ISC_TRUE)	{
 		/* an 'ephemeral' node is never reused. */
@@ -578,7 +581,8 @@ static dns_dbmethods_t ecdb_methods = {
 	NULL,			/* rpz_enabled */
 	NULL,			/* rpz_findips */
 	NULL,			/* findnodeext */
-	NULL			/* findext */
+	NULL,			/* findext */
+	NULL			/* update */
 };
 
 static isc_result_t

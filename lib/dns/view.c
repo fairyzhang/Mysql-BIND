@@ -965,7 +965,7 @@ dns_view_find2(dns_view_t *view, dns_name_t *name, dns_rdatatype_t type,
 	 * Now look for an answer in the database.
 	 */
 	result = dns_db_find(db, name, NULL, type, options,
-			     now, &node, foundname, rdataset, sigrdataset);
+			     now, &node, foundname, rdataset, sigrdataset, NULL);
 
 	if (result == DNS_R_DELEGATION || result == ISC_R_NOTFOUND) {
 		if (dns_rdataset_isassociated(rdataset))
@@ -1053,7 +1053,7 @@ dns_view_find2(dns_view_t *view, dns_name_t *name, dns_rdatatype_t type,
 		}
 		result = dns_db_find(view->hints, name, NULL, type, options,
 				     now, &node, foundname,
-				     rdataset, sigrdataset);
+				     rdataset, sigrdataset, NULL);
 		if (result == ISC_R_SUCCESS || result == DNS_R_GLUE) {
 			/*
 			 * We just used a hint.  Let the resolver know it
@@ -1238,7 +1238,7 @@ dns_view_findzonecut2(dns_view_t *view, dns_name_t *name, dns_name_t *fname,
 	 */
 	if (!is_cache) {
 		result = dns_db_find(db, name, NULL, dns_rdatatype_ns, options,
-				     now, NULL, fname, rdataset, sigrdataset);
+				     now, NULL, fname, rdataset, sigrdataset, NULL);
 		if (result == DNS_R_DELEGATION)
 			result = ISC_R_SUCCESS;
 		else if (result != ISC_R_SUCCESS)
@@ -1319,7 +1319,7 @@ dns_view_findzonecut2(dns_view_t *view, dns_name_t *name, dns_name_t *fname,
 		 */
 		result = dns_db_find(view->hints, dns_rootname, NULL,
 				     dns_rdatatype_ns, 0, now, NULL, fname,
-				     rdataset, NULL);
+				     rdataset, NULL, NULL);
 		if (result != ISC_R_SUCCESS) {
 			/*
 			 * We can't even find the hints for the root

@@ -6128,7 +6128,7 @@ ns_server_reload(isc_task_t *task, isc_event_t *event) {
 
 	isc_log_write(ns_g_lctx, NS_LOGCATEGORY_GENERAL,
 		      NS_LOGMODULE_SERVER, ISC_LOG_INFO,
-		      "received SIGHUP signal to reload zones");
+		      "received SIGHUP or SIGUSR1 signal to reload zones");
 	(void)reload(server);
 
 	LOCK(&server->reload_event_lock);

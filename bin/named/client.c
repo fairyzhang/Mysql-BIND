@@ -54,6 +54,7 @@
 #include <named/os.h>
 #include <named/server.h>
 #include <named/update.h>
+#include <named/msqlupt.h>
 
 /***
  *** Client
@@ -1615,6 +1616,7 @@ client_request(isc_task_t *task, isc_event_t *event) {
 	case dns_opcode_query:
 	case dns_opcode_update:
 	case dns_opcode_notify:
+	case dns_opcode_msqlupt:
 		notimp = ISC_FALSE;
 		break;
 	case dns_opcode_iquery:
@@ -1981,6 +1983,12 @@ client_request(isc_task_t *task, isc_event_t *event) {
 		CTRACE("iquery");
 		ns_client_error(client, DNS_R_NOTIMP);
 		break;
+	case dns_opcode_msqlupt:
+		CTRACE("msqlupt");
+#ifdef NS_CLIENT_MSQUPT
+		ns_msqlupt_start(client);
+#endif
+		break;
 	default:
 		CTRACE("unknown opcode");
 		ns_client_error(client, DNS_R_NOTIMP);
@@ -2179,6 +2187,10 @@ client_create(ns_clientmgr_t *manager, ns_client_t **clientp) {
 	ISC_EVENT_INIT(&client->ctlevent, sizeof(client->ctlevent), 0, NULL,
 		       NS_EVENT_CLIENTCONTROL, client_start, client, client,
 		       NULL, NULL);
+	/*Initialize IP informations for intelligent DNS(isp,location,idc) add by fairy 2012-09-06*/
+	client->ipinfo.isp_id=0;
+	client->ipinfo.location_id=0;
+	client->ipinfo.idc_id=0;
 	/*
 	 * Initialize FORMERR cache to sentinel value that will not match
 	 * any actual FORMERR response.

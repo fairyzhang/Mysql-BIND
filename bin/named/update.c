@@ -1712,7 +1712,7 @@ check_mx(ns_client_t *client, dns_zone_t *zone,
 		if ((options & DNS_ZONEOPT_CHECKINTEGRITY) == 0)
 			continue;
 		result = dns_db_find(db, &mx.mx, newver, dns_rdatatype_a,
-				     0, 0, NULL, foundname, NULL, NULL);
+				     0, 0, NULL, foundname, NULL, NULL, NULL);
 		if (result == ISC_R_SUCCESS)
 			continue;
 
@@ -1720,7 +1720,7 @@ check_mx(ns_client_t *client, dns_zone_t *zone,
 			result = dns_db_find(db, &mx.mx, newver,
 					     dns_rdatatype_aaaa,
 					     0, 0, NULL, foundname,
-					     NULL, NULL);
+					     NULL, NULL, NULL);
 			if (result == ISC_R_SUCCESS)
 				continue;
 		}

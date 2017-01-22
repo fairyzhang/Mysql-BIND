@@ -1256,7 +1256,7 @@ deleteit(dns_db_t *db, dns_dbversion_t *ver, dns_name_t *name,
 			     DNS_DBFIND_GLUEOK | DNS_DBFIND_NOWILD,
 			     (isc_stdtime_t) 0, NULL,
 			     dns_fixedname_name(&foundname),
-			     NULL, NULL);
+			     NULL, NULL, NULL);
 	if (result == DNS_R_EMPTYNAME || result == ISC_R_SUCCESS ||
 	    result ==  DNS_R_ZONECUT) {
 		*yesno = ISC_FALSE;

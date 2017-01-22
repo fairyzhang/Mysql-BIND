@@ -45,6 +45,7 @@ LIBDNS_EXTERNAL_DATA isc_logcategory_t dns_categories[] = {
 	{ "delegation-only", 0 },
 	{ "edns-disabled", 0 },
 	{ "rpz",	0 },
+	{ "mysqldb-update",	0 },
 	{ "rate-limit",	0 },
 	{ NULL, 	0 }
 };
@@ -83,6 +84,7 @@ LIBDNS_EXTERNAL_DATA isc_logmodule_t dns_modules[] = {
 	{ "dns/dlz",		0 },
 	{ "dns/dnssec",		0 },
 	{ "dns/crypto",		0 },
+	{ "mysqldb-update", 0 },
 	{ NULL, 		0 }
 };
 

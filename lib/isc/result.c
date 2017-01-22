@@ -102,7 +102,9 @@ static const char *text[ISC_R_NRESULTS] = {
 	"max size",				/*%< 58 */
 	"invalid address format",		/*%< 59 */
 	"bad base32 encoding",			/*%< 60 */
-	"unset",				/*%< 61 */
+	"mysqldb connecting error",                     /*%< 61 */
+	"mysqldb allocating additional memory",                     /*%< 62 */
+	"unset",				/*%< 63 */
 };
 
 #define ISC_RESULT_RESULTSET			2

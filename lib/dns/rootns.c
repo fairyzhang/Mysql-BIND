@@ -160,7 +160,7 @@ check_hints(dns_db_t *db) {
 
 	dns_rdataset_init(&rootns);
 	(void)dns_db_find(db, dns_rootname, NULL, dns_rdatatype_ns, 0,
-			  now, NULL, name, &rootns, NULL);
+			  now, NULL, name, &rootns, NULL, NULL);
 	result = dns_db_createiterator(db, 0, &dbiter);
 	if (result != ISC_R_SUCCESS)
 		goto cleanup;
@@ -333,10 +333,10 @@ check_address_records(dns_view_t *view, dns_db_t *hints, dns_db_t *db,
 	foundname = dns_fixedname_name(&fixed);
 
 	hresult = dns_db_find(hints, name, NULL, dns_rdatatype_a, 0,
-			      now, NULL, foundname, &hintrrset, NULL);
+			      now, NULL, foundname, &hintrrset, NULL,NULL);
 	rresult = dns_db_find(db, name, NULL, dns_rdatatype_a,
 			      DNS_DBFIND_GLUEOK, now, NULL, foundname,
-			      &rootrrset, NULL);
+			      &rootrrset, NULL, NULL);
 	if (hresult == ISC_R_SUCCESS &&
 	    (rresult == ISC_R_SUCCESS || rresult == DNS_R_GLUE)) {
 		result = dns_rdataset_first(&rootrrset);
@@ -375,10 +375,10 @@ check_address_records(dns_view_t *view, dns_db_t *hints, dns_db_t *db,
 	 * Check AAAA records.
 	 */
 	hresult = dns_db_find(hints, name, NULL, dns_rdatatype_aaaa, 0,
-			      now, NULL, foundname, &hintrrset, NULL);
+			      now, NULL, foundname, &hintrrset, NULL, NULL);
 	rresult = dns_db_find(db, name, NULL, dns_rdatatype_aaaa,
 			      DNS_DBFIND_GLUEOK, now, NULL, foundname,
-			      &rootrrset, NULL);
+			      &rootrrset, NULL, NULL);
 	if (hresult == ISC_R_SUCCESS &&
 	    (rresult == ISC_R_SUCCESS || rresult == DNS_R_GLUE)) {
 		result = dns_rdataset_first(&rootrrset);
@@ -446,7 +446,7 @@ dns_root_checkhints(dns_view_t *view, dns_db_t *hints, dns_db_t *db) {
 	name = dns_fixedname_name(&fixed);
 
 	result = dns_db_find(hints, dns_rootname, NULL, dns_rdatatype_ns, 0,
-			     now, NULL, name, &hintns, NULL);
+			     now, NULL, name, &hintns, NULL, NULL);
 	if (result != ISC_R_SUCCESS) {
 		isc_log_write(dns_lctx, DNS_LOGCATEGORY_GENERAL,
 			      DNS_LOGMODULE_HINTS, ISC_LOG_WARNING,
@@ -457,7 +457,7 @@ dns_root_checkhints(dns_view_t *view, dns_db_t *hints, dns_db_t *db) {
 	}
 
 	result = dns_db_find(db, dns_rootname, NULL, dns_rdatatype_ns, 0,
-			     now, NULL, name, &rootns, NULL);
+			     now, NULL, name, &rootns, NULL, NULL);
 	if (result != ISC_R_SUCCESS) {
 		isc_log_write(dns_lctx, DNS_LOGCATEGORY_GENERAL,
 			      DNS_LOGMODULE_HINTS, ISC_LOG_WARNING,

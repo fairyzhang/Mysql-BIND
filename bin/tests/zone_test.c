@@ -216,7 +216,7 @@ query(void) {
 				     0 /*time*/,
 				     NULL /*nodep*/,
 				     dns_fixedname_name(&found),
-				     &rdataset, &sigset);
+				     &rdataset, &sigset, NULL);
 		fprintf(stderr, "%s() returned %s\n", "dns_db_find",
 			dns_result_totext(result));
 		switch (result) {

@@ -60,7 +60,7 @@ struct dbinfo {
 };
 
 static void
-pgsqldb_destroy(const char *zone, void *driverdata, void **dbdata);
+pgsqldb_destroy(const char *zone, void *driverdata, void **dbdata, void *zone_data);
 
 /*
  * Canonicalize a string before writing it to the database.
@@ -115,11 +115,11 @@ maybe_reconnect(struct dbinfo *dbi) {
 static isc_result_t
 pgsqldb_lookup(const char *zone, const char *name, void *dbdata,
 	       dns_sdblookup_t *lookup, dns_clientinfomethods_t *methods,
-	       dns_clientinfo_t *clientinfo)
+	       dns_clientinfo_t *clientinfo,void *source_ip,dns_rdatatype_t type, void *zone_data)
 #else
 static isc_result_t
 pgsqldb_lookup(const char *zone, const char *name, void *dbdata,
-	       dns_sdblookup_t *lookup)
+	       dns_sdblookup_t *lookup,void *source_ip,dns_rdatatype_t type, void *zone_data)
 #endif /* DNS_CLIENTINFO_VERSION */
 {
 	isc_result_t result;
@@ -134,7 +134,10 @@ pgsqldb_lookup(const char *zone, const char *name, void *dbdata,
 	UNUSED(methods);
 	UNUSED(clientinfo);
 #endif /* DNS_CLIENTINFO_VERSION */
-
+	UNUSED(source_ip);
+	UNUSED(type);
+	UNUSED(zone_data);
+	
 	canonname = isc_mem_get(ns_g_mctx, strlen(name) * 2 + 1);
 	if (canonname == NULL)
 		return (ISC_R_NOMEMORY);
@@ -302,12 +305,13 @@ pgsqldb_create(const char *zone, int argc, char **argv,
  * Close the connection to the database.
  */
 static void
-pgsqldb_destroy(const char *zone, void *driverdata, void **dbdata) {
+pgsqldb_destroy(const char *zone, void *driverdata, void **dbdata, void *zone_data) {
 	struct dbinfo *dbi = *dbdata;
 
 	UNUSED(zone);
 	UNUSED(driverdata);
-
+	UNUSED(zone_data);
+	
 	if (dbi->conn != NULL)
 		PQfinish(dbi->conn);
 	if (dbi->database != NULL)
@@ -335,7 +339,9 @@ static dns_sdbmethods_t pgsqldb_methods = {
 	NULL, /* authority */
 	pgsqldb_allnodes,
 	pgsqldb_create,
-	pgsqldb_destroy
+	pgsqldb_destroy,
+	NULL,	/* lookup2 */
+	NULL	/*zonedata for Intelligent DNS*/
 };
 
 /*
