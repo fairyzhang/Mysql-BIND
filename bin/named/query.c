@@ -7354,30 +7354,30 @@ log_end_query(ns_client_t *client) {
 	char t[4096];
 	
 	if (! isc_log_wouldlog(ns_g_lctx, level))
-		return (ISC_R_FAILURE);
+		return;
 	
 	if (ISC_LIST_EMPTY(client->message->sections[DNS_SECTION_ANSWER]))
-		return (ISC_R_FAILURE);
+		return;
 	dns_name_t *name = ISC_LIST_HEAD(client->message->sections[DNS_SECTION_ANSWER]);
 		
 	rdataset = ISC_LIST_HEAD(name->list);
 
 	if (!dns_rdataset_isassociated(rdataset))
-		return (ISC_R_SUCCESS);
+		return;
 
 	isc_buffer_init(&target, t, sizeof(t));
 
 	result = dns_rdataset_totext(rdataset, name, ISC_FALSE, ISC_FALSE,
 				     &target);
 	if (result != ISC_R_SUCCESS)
-		return (result);
+		return;
 	isc_buffer_usedregion(&target, &r);
 
 	ns_client_log(client, NS_LOGCATEGORY_QUERIES, NS_LOGMODULE_QUERY,
 		      level, "query: %.*s",
 		      (int)r.length, (char *)r.base);
 
-	return (ISC_R_SUCCESS);
+	return;
 }
 
 static inline void
