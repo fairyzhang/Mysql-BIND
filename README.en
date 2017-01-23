@@ -1,0 +1,219 @@
+# Mysql_BIND
+## Introduction
+
+This is a DNS system for easy management configuration which has been run for about 4 years at RenRen Inc.. It is based on BIND-9.9.2-P1 and the great difference from original BIND is using Mysql database instead of VIEW configuration.
+
+Mysql_BIND can provide an intelligent DNS system which switches domain name resolution among different network operators or locations easily and rapidly . And the records of name zone are storing only once in Mysql database, not to configure each time for each VIEW in original BIND.
+
+There are tow types of database tables : IP table and domain name resolution table. And each type of table has three important elements: network opeation , location of user IP and Internet Data Center for hoping resolution of user DNS querying which could assosiate user IP and resolution results.
+
+Mysql_BIND also provide a resolution priority for domain name to ensure responding the best resolution in limit resources to user DNS query.
+
+## Principle
+
+Mysql_BIND has reserved all the functions of original BIND, and added the function that storing IP information and domain name resolution by Mysql Database.If you want to use the data in database to respond user request, you should configure tow types of database tables: 1) the table of IP address setion and 2) the table of domain name resolution. The configuration of IP address section table is for all the domain using database and must be in the top of {}. And the configuration of domain name resolution database can be in the VIEW section or in the top of {}. The result of resolution is depended on these two types of database tables. So these two types configuration must exist together, if you want to respond the user request by using database.
+
+Mysql_BIND locates the user IP informations by using IP tables which indicate 1) the network operator of user IP, 2) the location and 3)the Internet data center that the user visits most rapidly. Then Mysql_BIND will find the result by querying the data of domain name resolution table according to those three elements above. Mysql_BIND can respond different results for the user from different areas or network operators, because every record of resolution table also contains 1)the network operator, 2)the location information and 3) the Internet Data Center.
+
+The resolution data is only need to configure one time in the resolution table, which should be configured once in every VIEW of original BIND. The resolution result for user querying is depend on the IP information of user DNS and matching priority in Mysql-BIND. Mysql-BIND will respond the most optimal results on the basis of matching priority. The matching sequence is 1)the same Internet Data Center, 2)the same network operator and location information, 3) the same network operator, 4) the same location information, 5) all the resolution data, 6) the resolution data of extensive domain name.
+
+The three elements mentioned above that 1)network operator, 2)location, 3)Internet Data Center are the core of Mysql-BIND . The best situation is all the elements are real, for this reason Mysql-BIND could respond the best results to user. But we cannot build so many Internet Data Centers for each location in reality, so that we must configure the correspondence to respond the best resolution results in limit resources. And the users can access the  fastest response Internet Data Center by forging the three elements mentioned above.
+
+The tables of IP section stored in database is used for locating the user IP address. There are several IP tables for different domain names which have the same structure.  And there exist a matching sequence to choose the IP table for locating IP address : 1)the IP table for one special domain name, 2)the IP table for all the domain names of one special zone, 3) the IP table for all the domain names. There are also naming regulations for the names of different type tables. The table names for one special domain name are filled with 'ip_' and the value of replacing '.' with '_' of domain name. The table names for one special zone are filled with ‘ip_’ and the value of replacing '.' with '_' of zone name. The table name for all the domain names is fixed to 'ip_tbl’ which can exist once in the database. All the table names of IP tables are start with ‘ip_', and they will be read into memory from database while starting Mysql_BIND. The IP section data stored in the IP tables can be obtained from 'whois' command or some websites for storing IP information, such as ‘apnic.net', ‘ripe.net', ‘arin.net' and so on. The method of locating information in one IP table is to find the information of minimal IP section of user IP address. The administrator can config smaller IP section for the users from some special areas. If there are multiple duplicate IP section records in one IP table, Mysql_BIND would return the result of first  record in database ordered by primary key. It is imperative to config three elements mentioned above for all the records in database , which are 1) the network operator of user DNS IP address, 2)location information of user DNS IP address, and 3)the Internet Data Center that the user will access.  They are the determinations for Mysql_BIND matching the resolution result exactly.
+
+The values of three elements in IP tables can be configured to 0, which indicate that Mysql_BIND will skip to the next matching priority to respond user query. For example, if the field value of Internet Data Center is set to 0, Mysql_BIND will skip to the priority '2)the same network operator and location information’. And if the filed value of location information is set to 0 at the same time, Mysql_BIND will skip to the priority ‘3)the same network operator’. There may be many Internet Data Centers which are in the same network operator. So this configuration method is very important and flexible if you except the users from the same network operator but from different areas can access several Internet Data Centers.
+
+After fetching the three elements above of user IP address information, Mysql_BIND will find the resolution information from domain name resolution tables stored in database. The domain name resolution table is based on the granularity of zone. All the domain name resolution records of one zone are stored in the one table. The values of the table name are replacing ‘.' with ‘_' of zone name, and the value starting with ‘ip_’ will be recognized IP table not resolution table. It is imperative to stored a accurate SOA record for all the user IP addresses, otherwise all the domain names of this zone will be error. There are also other resolution dataset type records in database , such as records of type A, NS, AAAA and so on, which are similar with the configuration of original BIND. But the formula of these records in database must be the integral domain name, not the prefix in original BIND. There must be three element fields of every records in resolution table of zone:  1) the network operator, 2) the location information of the resolution record and 3) the Internet Data Center of the resolution data which are similar with IP tables. The values of these three elements can also be set to 0, but the meaning is different from IP tables which indicates ‘ANY' that Mysql_BIND will return this record for all the users query. For example, the SOA record can only exist once in one table and the three elements are set to 0, so it will be responded to all the users querying SOA record based on the most top priority. Of course, if the values are not set to 0, this record can also be responded to user query based on matching priority sequence, for there only one record of SOA type.
+
+Mysql_BIND is only supported the resolution for IPv4 address right now, and the common types such as A, NS, CNAME and so on. Some complex function such as DNSSEC will be supported in the later.
+
+## Installation
+1. Install the libeary of Mysql.
+2. Edit 'bin/named/Makefile.in' file:
+    1) Change the value of 'DBDRIVER_INCLUDES' into the result of executing 'mysql_config --cflags' command.
+        (Ex. DBDRIVER_INCLUDES = -I/usr/include/mysql  -g -pipe -Wp,-D_FORTIFY_SOURCE=2 -fexceptions -fstack-protector --param=ssp-buffer-size=4 -m64 -D_GNU_SOURCE -D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE -fno-strict-aliasing -fwrapv -fPIC   -DUNIV_LINUX -DUNIV_LINUX)
+    2) Change the value of 'DBDRIVER_LIBS' into the result of executing 'mysql_config --libs' command.
+        (Ex. DBDRIVER_LIBS = -rdynamic -L/usr/lib64/mysql -lmysqlclient -lz -lcrypt -lnsl -lm -lssl -lcrypto)
+3. ./configure
+    You can specify the install root directory by '--prefix' option. You can also run './configure --help' for more libraries help.
+4. make
+5. make install
+
+## Configuration
+
+### The main configuration file 'named.conf'
+Add the configuration of IP table database connection.
+    mysqlipdb { #This section must in the top {}. If this section is not exist or has some problems, Mysql_BIND will respond all the results, not using intelligent resolution.
+    #       host "localhost";             #db host, default localhost
+    #       port 3306;                    #db port, default 3306
+            database "mysql_bind";        #database name, must configure
+            user "root";                #user name, default root
+            password "";                #password of database, default ''
+    };
+
+Add the zone configuration.
+    zone "myexample.com"{
+          type master;
+          notify no;
+          database "mysqldb mysql_bind localhost user passwd ";
+#This configuration is using Mysql database. The sequence of database value is 1) the fixed value 'mysqldb', 2) the name of database, 3) the host of database, 4) the user name of  database and 5)password of database.
+    };
+The table names of the zone in database must be the value of replacing '.' with '_' of zone name.(Ex. The table name of domain 'myexample.com' is myexample_com.)
+
+Add log configuration of Mysql database module.The log information is using 'database' category.
+    logging {
+            channel db_log {                                     #The log channel configuration. All the items are as same as original BIND.
+                    file "var/run/named/named.db" versions 3 size 20m;
+                    severity info;
+                    print-time 1;
+                    print-severity 1;
+                    print-category 1;
+            };
+
+            category database {                                   #The log category configuration.
+                    db_log;
+            };
+    };
+
+### Mysql database configuration
+There are three types of tables: 1)IP table, 2)domain name resolution table and 3)other tables for management and operation.
+
+#### IP table
+All the IP tables have the same structure whose name can distinguish zone or domain name. There are three types :
+1) Default IP table for all the domain name. The table name is fixed to 'ip_tbl'.
+2) The IP table suit for all the domain of a special zone. The table name is filled with 'ip_' and the value of replacing '.' with '_' of zone name.
+    (Ex. The table name of zone 'myexample.com' is 'myexample_com'.)
+3) The IP table only suit for a special domain. The table name is filled with 'ip_' and the value of replacing '.' with '_' of domain name.
+    (EX. The table name of domain 'a.myexample.com' is 'a_myexample_com'.)
+3, 2 then 1 is the order in locating user IP information.
+The SQL of creating IP table is as follow which is an example of 'ip_tbl':
+    CREATE TABLE `ip_tbl` (                                       #The name of IP table
+      `id` int(11) NOT NULL auto_increment,                       #Primary key
+      `sip` int(10) unsigned NOT NULL default '0',                #The IP address of CIDR section, must stored in Decimal format
+      `mask` int(11) NOT NULL default '0',                        #The mask of CIDR section
+      `real_isp_id` int(11) NOT NULL default '0',                 #The foreign key of real network operator
+      `real_location_id` int(11) NOT NULL default '0',            #The foreign key of real loacation information
+      `isp_id` int(11) NOT NULL default '0',                      #The foreign key of forged network operator
+      `location_id` int(11) NOT NULL default '0',                 #The foreign key of forged location information
+      `idc_id` int(11) NOT NULL default '0',                      #The foreign key of Internet Data Center that Mysql_BIND expects user visit to
+      PRIMARY KEY  (`id`)
+    ) DEFAULT CHARSET=utf8;
+In this type of tables, the fields of isp_id, location_id and idc_id are the elements that Mysql_BIND would use. And the fields of real_isp_id, real_location_id are only used for reference in forging those three elements above.
+The convert function between string and decimal format of IP address is 'inet_ntoa' and 'inet_aton' in Mysql Database.
+
+#### Domain name resolution table
+The zone table is only for this zone, and the name is the value of replaying '.' with '_' of zone name.
+The creating SQL is as follow, for example 'myexample.com'
+    CREATE TABLE `myexample_com` (                                #The table name of zone 'myexample.com'
+      `id` int(11) NOT NULL auto_increment,                       #Primary key
+      `name` varchar(255) NOT NULL default '',                    #Domain name which should be whole name
+      `ttl` int(11) NOT NULL default '0',                         #TTL which is second unit
+      `rdtype_id` int(11) NOT NULL default '0',                   #The type of resolution data, ex. NS, A and SOA etc.
+      `rdata` varchar(255) NOT NULL default '',                   #The data of resolution
+      `isp_id` int(11) NOT NULL default '0',                      #The foreign key of network operator
+      `location_id` int(11) NOT NULL default '0',                 #The foreign key of location information
+      `idc_id` int(11) NOT NULL default '0',                      #The foreign key of Internet Data Center
+      `flag` tinyint(4) NOT NULL default '0',                     #Valid flag, 1 is valid and 0 is not valid
+      `opt_time` int(11) NOT NULL default '0'                     #Operation time
+      PRIMARY KEY  (`id`)
+    ) DEFAULT CHARSET=utf8;
+
+#### Management table
+This set of tables is only for management and operation. The name of foreign key above will be listed in this set of tables.
+
+Network operator table
+    create table isp_tbl (
+        id int not null primary key auto_increment,               #Primary key
+        `name` varchar(255) not null DEFAULT ''                   #The name of network operator. Ex. China Unicom, China Mobile and etc.
+    )DEFAULT CHARSET=utf8;
+
+Location information table
+    create table location_tbl (
+        id int not null primary key auto_increment,               #Primary key
+        `name` varchar(255) not null DEFAULT ''                   #The name of location information. Ex. China, US and etc.
+    )DEFAULT CHARSET=utf8;
+
+Internet Data Center table
+    create table idc_tbl (
+        id int not null primary key auto_increment,               #Primary key
+        `name` varchar(255) not null DEFAULT ''                   #The name of Internet Data Center
+    )DEFAULT CHARSET=utf8;
+
+The type of resolution data table whose data is fixed.
+THe SQLs of creating table and inserting data are as follow.
+CREATE TABLE `rdtype_tbl` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,                           #Primary key
+  `rdid` int(11) NOT NULL,                                        #The ID of type. This value is the value of 'rdtype_id' in the resolution table and should be unique
+  `name` varchar(255) NOT NULL DEFAULT '',                        #The type name
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `rdid` (`rdid`)
+) DEFAULT CHARSET=utf8；
+INSERT INTO `rdtype_tbl` VALUES (1,0,'NONE'),(2,1,'A'),(3,2,'NS'),(4,3,'MD'),(5,4,'MF'),(6,5,'CNAME'),(7,6,'SOA'),(8,7,'MB'),(9,8,'MG'),(10,9,'MR'),(11,10,'NULL'),(12,11,'WKS'),(13,12,'PTR'),(14,13,'HINFO'),(15,14,'MINFO'),(16,15,'MX'),(17,16,'TXT'),(18,17,'RP'),(19,18,'AFSDB'),(20,19,'X25'),(21,20,'ISDN'),(22,21,'RT'),(23,22,'NSAP'),(24,23,'NSAP_PTR'),(25,24,'SIG'),(26,25,'KEY'),(27,26,'PX'),(28,27,'GPOS'),(29,28,'AAAA'),(30,29,'LOC'),(31,30,'NXT'),(32,33,'SRV'),(33,35,'NAPTR'),(34,36,'KX'),(35,37,'CERT'),(36,38,'A6'),(37,39,'DNAME'),(38,41,'OPT'),(39,42,'APL'),(40,43,'DS'),(41,44,'SSHFP'),(42,45,'IPSECKEY'),(43,46,'RRSIG'),(44,47,'NSEC'),(45,48,'DNSKEY'),(46,49,'DHCID'),(47,50,'NSEC3'),(48,51,'NSEC3PARAM'),(49,52,'TLSA'),(50,55,'HIP'),(51,59,'CDS'),(52,60,'CDNSKEY'),(53,61,'OPENPGPKEY'),(54,99,'SPF'),(55,103,'UNSPEC'),(56,104,'NID'),(57,105,'L32'),(58,106,'L64'),(59,107,'LP'),(60,108,'EUI48'),(61,109,'EUI64'),(62,249,'TKEY'),(63,250,'TSIG'),(64,256,'URI'),(65,257,'CAA'),(66,32769,'DLV'),(67,65533,'KEYDATA'),(68,251,'IXFR'),(69,252,'AXFR'),(70,253,'MAILB'),(71,254,'MAILA'),(72,255,'ANY');
+
+## Examples
+All the values below are the string format, such as IP addresses, network operators, type names and so on.
+
+### Example 1
+If we expect that the users from China Unicom in Beijing visit the servers of China Unicom IDC in Beijing when they request the domain 'a.myexample.com' and the users from China Mobile in Beijing visit the servers of China Mobile IDC in Beijing, we can configure the table data as follow.
+
+The part data of table 'ip_myexample_com' :
++-----------------+------+-------------------+---------------+-------------------+--------------+-----------------------------------+
+| sip              | mask | real_isp          | real_location | isp_id            | location_id  | idc_id                            |
++-----------------+------+-------------------+---------------+-------------------+--------------+-----------------------------------+
+| 118.186.208.0   |   20 | China Unicom      | Beijing       | China Unicom      | Beijing      | China Unicom IDC in Beijing       |
+| 219.141.128.0   |   17 | China Mobile      | Beijing       | China Mobile      | Beijing      | China Mobile IDC in Beijing       |
+
+The part data of table 'myexample_com' :
++--------------------+-------+-----------+-------------------+-------------------+--------------+-----------------------------------+
+| name                 | ttl   | rdtype_id | rdata             | isp_id            | location_id  | idc_id                            |
++--------------------+-------+-----------+-------------------+-------------------+--------------+-----------------------------------+
+| a.myexample.com    |   900 | A         | 123.125.40.1      | China Unicom      | Beijing      | China Unicom IDC in Beijing       |
+| a.myexample.com    |   900 | A         | 220.181.1.1       | China Mobile      | Beijing      | China Mobile IDC in Beijing       |
+
+Mysql_BIND can respond the user query using the highest priority 'same Internet Data Center'.
+
+### Example 2
+If we expect that the users from China Unicom in Beijing visit the servers of China Unicom IDC in Beijing when they request the domain 'a.myexample.com' and visit the servers of China BGP in Beijing when they request the domain 'a.myexample.com', we can configure the table data as follow.
+
+The part data of table 'ip_a_myexample_com' :
++-----------------+------+-------------------+---------------+-------------------+--------------+-----------------------------------+
+| sip              | mask | real_isp          | real_location | isp_id            | location_id  | idc_id                            |
++-----------------+------+-------------------+---------------+-------------------+--------------+-----------------------------------+
+| 118.186.208.0   |   20 | China Unicom      | Beijing       | China Unicom      | Beijing      | China Unicom IDC in Beijing       |
+
+The part data of table 'ip_b_myexample_com' :
++-----------------+------+-------------------+---------------+-------------------+--------------+-----------------------------------+
+| sip              | mask | real_isp          | real_location | isp_id            | location_id  | idc_id                            |
++-----------------+------+-------------------+---------------+-------------------+--------------+-----------------------------------+
+| 118.186.208.0   |   20 | China Unicom      | Beijing       | China Unicom      | Beijing      | China BGP IDC in Beijing          |
+
+The part data of table 'myexample_com' :
++--------------------+-------+-----------+-------------------+-------------------+--------------+-----------------------------------+
+| name                 | ttl   | rdtype_id | rdata             | isp_id            | location_id  | idc_id                            |
++--------------------+-------+-----------+-------------------+-------------------+--------------+-----------------------------------+
+| a.myexample.com    |   900 | A         | 123.125.40.1      | China Unicom      | Beijing      | China Unicom IDC in Beijing       |
+| b.myexample.com    |   900 | A         | 220.123.1.1       | China BGP         | Beijing      | China BGP IDC in Beijing          |
+
+Mysql_BIND can respond the user query using the highest priority 'same Internet Data Center'.
+
+### Example 3
+If we expect that the users from China Mobile in Beijing visit the servers of China Mobile IDC in Beijing, the users from China Mobile in Shanghai visit the servers of China Mobile IDC in Shanghai, and the user from China Mobile in other locations visit the servers of these two IDCs above, we can configure the table data as follow:
+
+The part of table 'ip_myexample_com' :
++-----------------+------+-------------------+---------------+-------------------+--------------+-----------------------------------+
+| sip              | mask | real_isp          | real_location | isp_id            | location_id  | idc_id                            |
++-----------------+------+-------------------+---------------+-------------------+--------------+-----------------------------------+
+| 111.150.0.0     |   16 | China Mobile      | Beijing       | China Mobile      | Beijing      | China Mobile IDC in Beijing       |
+| 111.212.0.0     |   17 | China Mobile      | Shanghai      | China Mobile      | Shanghai     | China Mobile in Shanghai          |
+| 183.196.0.0     |   15 | China Mobile      | Hebe          | China Mobile      | 0            | 0                                 |
+| 183.208.0.0     |   14 | China Mobile      | Jiangsu       | China Mobile      | 0            | 0                                 |
+
+The part of table 'myexample_com' :
++--------------------+-------+-----------+-------------------+-------------------+--------------+-----------------------------------+
+| name                 | ttl   | rdtype_id | rdata             | isp_id            | location_id  | idc_id                            |
++--------------------+-------+-----------+-------------------+-------------------+--------------+-----------------------------------+
+| a.myexample.com    |   900 | A         | 111.13.1.1        | China Mobile      | Beijing      | China Mobile IDC in Beijing       |
+| a.myexample.com    |   900 | A         | 112.26.1.1        | China Mobile      | Shanghai     | China Mobile in Shanghai          |
+
+Mysql_BIND can respond the users query from Beijing and Shanghai using the highest priority 'same Internet Data Center'.
+Mysql_BIND can respond the users query from other locations using the third priority 'same network operator'. And they will get the resolution data of these tow IDCs above, for the value of idc_id and location_id in IP table has been set to 0.
