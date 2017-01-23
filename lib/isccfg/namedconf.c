@@ -123,6 +123,7 @@ static cfg_type_t cfg_type_zoneopts;
 static cfg_type_t cfg_type_dynamically_loadable_zones;
 static cfg_type_t cfg_type_dynamically_loadable_zones_opts;
 static cfg_type_t cfg_type_v4_aaaa;
+static cfg_type_t cfg_type_mysqlipdb;
 
 /*
  * Clauses that can be found in a 'dynamically loadable zones' statement
@@ -858,6 +859,7 @@ namedconf_clauses[] = {
 	{ "lwres", &cfg_type_lwres, CFG_CLAUSEFLAG_MULTI },
 	{ "statistics-channels", &cfg_type_statschannels,
 	  CFG_CLAUSEFLAG_MULTI },
+	{ "mysqlipdb", &cfg_type_mysqlipdb, 0 },
 	{ NULL, NULL, 0 }
 };
 
@@ -951,6 +953,19 @@ options_clauses[] = {
 	{ "use-v4-udp-ports", &cfg_type_bracketed_portlist, 0 },
 	{ "use-v6-udp-ports", &cfg_type_bracketed_portlist, 0 },
 	{ "version", &cfg_type_qstringornone, 0 },
+	{ NULL, NULL, 0 }
+};
+
+/*%
+ * Clauses that can be found within the 'mysqlipdb' statement.
+ */
+static cfg_clausedef_t
+mysqlipdb_clauses[] = {
+	{ "host", &cfg_type_qstring, 0 },
+	{ "port", &cfg_type_uint32, 0 },
+	{ "database", &cfg_type_qstring, 0 },
+	{ "user", &cfg_type_qstring, 0 },
+	{ "password", &cfg_type_qstring, 0 },
 	{ NULL, NULL, 0 }
 };
 
@@ -1818,6 +1833,16 @@ LIBISCCFG_EXTERNAL_DATA cfg_type_t cfg_type_addzoneconf = {
 };
 
 
+/*% The "mysqlipdb" statement syntax. */
+
+static cfg_clausedef_t *
+mysqlipdb_clausesets[] = {
+	mysqlipdb_clauses,
+	NULL
+};
+static cfg_type_t cfg_type_mysqlipdb = {
+	"mysqlipdb", cfg_parse_map, cfg_print_map, cfg_doc_map, &cfg_rep_map, mysqlipdb_clausesets };
+	
 static isc_result_t
 parse_unitstring(char *str, isc_resourcevalue_t *valuep) {
 	char *endp;

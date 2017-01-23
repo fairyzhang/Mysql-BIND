@@ -84,7 +84,7 @@ typedef void
 
 /*Caching zone data info for Intelligent DNS */
 typedef isc_result_t
-(*dns_sdbzonedatafunc_t)(const char *zone, void *driverdata, void **zone_data);
+(*dns_sdbzonedatafunc_t)(const char *zone, int argc, char **argv, void *driverdata, void **zone_data);
 
 /*Caching zone data info for Intelligent DNS */
 typedef isc_result_t

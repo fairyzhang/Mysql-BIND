@@ -866,8 +866,9 @@ findext(dns_db_t *db, dns_name_t *name, dns_dbversion_t *version,
 		dns_name_getlabelsequence(name, nlabels - i, i, xname);
 		result = findnodeext(db, xname, ISC_FALSE, methods,
 				     clientinfo, &node, ip_info,type);
-		if(result  == ISC_R_MYSQLDBNOTCONNECT)
+		if(result  == ISC_R_MYSQLDBNOTCONNECT){
             continue;
+        }
 		if (result == ISC_R_NOTFOUND) {
 			/*
 			 * No data at zone apex?
@@ -1418,7 +1419,7 @@ dns_sdb_create(isc_mem_t *mctx, dns_name_t *origin, dns_dbtype_t type,
 	/*Data of intelligent DNS*/
        sdb->zone_data = NULL;
        if(imp->methods->zonedata != NULL){
-               result = imp->methods->zonedata(zonestr, sdb->dbdata, &sdb->zone_data);
+               result = imp->methods->zonedata(zonestr, argc, argv, sdb->dbdata, &sdb->zone_data);
                if(result != ISC_R_SUCCESS)
                        goto cleanup_destroy;
        }
@@ -1485,8 +1486,7 @@ static dns_rdatasetmethods_t methods = {
 	NULL,
 	NULL,
 	NULL,
-	NULL,
-	zonedata_update
+	NULL
 };
 
 static void

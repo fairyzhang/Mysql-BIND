@@ -127,7 +127,6 @@ struct dbinfo
 {
     MYSQL conn;
     char *database;
-    char *table;
     char *host;
     char *user;
     char *passwd;
@@ -189,25 +188,14 @@ struct mysqldb_zonedata{
 	mysqldb_datanode_t **        hashtable;
 };
 
+static isc_result_t dbi_init(void *driverdata, struct dbinfo **dbdata, int argc, char **argv);
+
 static void mysqldb_destroy(const char *zone, void *driverdata, void **dbdata, void *zone_data);
 
-/*
- * Canonicalize a string before writing it to the database.
- * "dest" must be an array of at least size 2*strlen(source) + 1.
- */
-static void quotestring(const char *source, char *dest)
-{
-    while (*source != 0)
-    {
-        if (*source == '\'')
-            *dest++ = '\'';
-        /* SQL doesn't treat \ as special, but PostgreSQL does */
-        else if (*source == '\\')
-            *dest++ = '\\';
-        *dest++ = *source++;
-    }
-    *dest++ = 0;
-}
+static isc_result_t trans_zone_into_dbname(MYSQL *conn, const char *zone, char *tbl_name);
+
+static int split_qname_by_dot(const char *qname, char **split_name);
+
 
 /*
  * Connect to the database.
@@ -271,7 +259,7 @@ static isc_result_t mysqldb_put_res(dns_sdblookup_t *lookup, const dns_rdatatype
 	char rdtype_str[sizeof("TYPE65536")];
 	result = mysqldb_return_typestr(rdtype, rdtype_str);
 	if(result == ISC_R_SUCCESS){
- 		result = dns_sdb_putrr(lookup, rdtype_str,ttl, rdata);
+        result = dns_sdb_putrr(lookup, rdtype_str, ttl, rdata);
 	}
 	
 	return result;
@@ -291,7 +279,7 @@ static isc_result_t mysqldb_put_res(dns_sdblookup_t *lookup, const dns_rdatatype
  * return value - zero : not find res set or error
  *		   non-zero : the number of returning data count
  */
-static isc_result_t mysqldb_findrule_datalist(mysqldb_datanode_t *datanode, const int rule_id,
+static isc_uint32_t mysqldb_findrule_datalist(mysqldb_datanode_t *datanode, const int rule_id,
 										const isc_int16_t isp_id, const isc_int16_t location_id, const isc_int16_t idc_id,
 										const dns_rdatatype_t type, dns_sdblookup_t *lookup){
 	
@@ -408,10 +396,10 @@ static isc_result_t mysqldb_find_datalist(mysqldb_datanode_t *datanode,
 									const mysqldb_ipinfo_t *ip_info,
 									const dns_rdatatype_t type, dns_sdblookup_t *lookup){
 	if(datanode == NULL || lookup == NULL)
-		return ISC_R_FAILURE;
+	    return (ISC_R_FAILURE);
 
 	if(datanode->listcount == 0)
-		return ISC_R_FAILURE;
+		return (ISC_R_FAILURE);
 
 	mysqldb_datainfo_t *datalist = &datanode->head;
 	isc_result_t result = ISC_R_FAILURE;
@@ -499,6 +487,7 @@ static isc_result_t mysqldb_find_datalist(mysqldb_datanode_t *datanode,
  * finding datanode from hash table
  *
  * args 	domain_name : domain name of user request
+ *				zone : the zone of domain
  *		      zone_data : hash list pointer of hash table which ndata is the same as query name
  *				   sip : source ip of user
  *		mysqldb_ipinfo : the information of ip isp,location,etc for return
@@ -506,7 +495,7 @@ static isc_result_t mysqldb_find_datalist(mysqldb_datanode_t *datanode,
  * return - result : the value of ISC_R_SUCCESS is meaning found successfully.
  *			      the value of ISC_R_FAILURE and other value is meaning error .
  */
-static mysqldb_datanode_t *mysqldb_find_node(const char *domain_name, mysqldb_zonedata_t *zone_data,
+static mysqldb_datanode_t *mysqldb_find_node(const char *domain_name, const char *zone, mysqldb_zonedata_t *zone_data,
 												const isc_sockaddr_t *sip, mysqldb_ipinfo_t *mysqldb_ipinfo,
 												const dns_rdatatype_t type){
 	mysqldb_datanode_t *datanode;
@@ -531,14 +520,19 @@ static mysqldb_datanode_t *mysqldb_find_node(const char *domain_name, mysqldb_zo
 	//find isp,location of user DNS ip
 	if(datanode != NULL && type != dns_rdatatype_soa){
 		if(datanode->listcount > 1){
-			if(mysqlip_locate_information(domain_name,sip,
-						&mysqldb_ipinfo->isp_id, &mysqldb_ipinfo->location_id, &mysqldb_ipinfo->idc_id,
-						&ipdb_info)== ISC_R_FAILURE){
-
+			if(mysqlip_radix_search(domain_name,zone, sip,&mysqldb_ipinfo->isp_id,
+				&mysqldb_ipinfo->location_id, &mysqldb_ipinfo->idc_id) != ISC_R_SUCCESS) {
+				
 				mysqldb_ipinfo->isp_id = -1;
 				mysqldb_ipinfo->location_id = -1;
 				mysqldb_ipinfo->idc_id = -1;
 			}
+			
+			ns_mysqlip_log(sip, DNS_LOGCATEGORY_DATABASE,
+			      DNS_LOGMODULE_MYSQL, ISC_LOG_DEBUG(7),
+			      "Locating IP(isp %d, location %d, idc %d) information successfully for domain (%s)",
+			      mysqldb_ipinfo->isp_id, mysqldb_ipinfo->location_id, mysqldb_ipinfo->idc_id,
+			      domain_name);
 		}
 	}
 	return datanode;//not found if null
@@ -557,7 +551,7 @@ static mysqldb_datanode_t *mysqldb_find_node(const char *domain_name, mysqldb_zo
  * return - result : the value of ISC_R_SUCCESS is meaning found successfully.
  *			      the value of ISC_R_FAILURE and other value is meaning error .
  */
-static isc_result_t mysqldb_find_res(const char *zone, const char *domain_name, 
+static isc_result_t mysqldb_find_res(const char *zone, const char *domain_name,
 	                           					dns_sdblookup_t *lookup, const isc_sockaddr_t *sip,
 	                           					const dns_rdatatype_t type, mysqldb_zonedata_t *zone_data){
 	isc_result_t result = (ISC_R_FAILURE);
@@ -567,17 +561,24 @@ static isc_result_t mysqldb_find_res(const char *zone, const char *domain_name,
 	if(zone == NULL || domain_name == NULL ||lookup == NULL || zone_data == NULL)
 		return result;
 	
-	datanode = mysqldb_find_node(domain_name, zone_data, sip, &mysqldb_ipinfo, type);
+	datanode = mysqldb_find_node(domain_name, zone, zone_data, sip, &mysqldb_ipinfo, type);
 	if(datanode == NULL){
 		//find *.zone
 		char fan_name[255];
 		memset(fan_name,'\0',255);
 		snprintf(fan_name,sizeof(fan_name),"*.%s",zone);
+
+		ns_mysqlip_log(sip, DNS_LOGCATEGORY_DATABASE,
+			      DNS_LOGMODULE_MYSQL, ISC_LOG_DEBUG(1),
+			      "Find %s for request", fan_name);
 		
-		datanode = mysqldb_find_node(fan_name,zone_data,sip,&mysqldb_ipinfo,dns_rdatatype_soa);
+		datanode = mysqldb_find_node(fan_name, zone, zone_data, sip, &mysqldb_ipinfo, dns_rdatatype_soa);
 		if(datanode == NULL){ //find SOA of domain for *.zone
-			datanode = mysqldb_find_node(zone,zone_data,sip,&mysqldb_ipinfo,dns_rdatatype_soa);
-		
+			datanode = mysqldb_find_node(zone, zone, zone_data,sip,&mysqldb_ipinfo,dns_rdatatype_soa);
+			ns_mysqlip_log(sip, DNS_LOGCATEGORY_DATABASE,
+				      DNS_LOGMODULE_MYSQL, ISC_LOG_DEBUG(1),
+				      "Find SOA of zone(%s) for the rdata of %s is not exist", zone, fan_name);
+			
 			if(datanode == NULL){
 				return result;
 			}
@@ -586,7 +587,7 @@ static isc_result_t mysqldb_find_res(const char *zone, const char *domain_name,
 		}
 	}
 	
-	result = mysqldb_find_datalist(datanode, &mysqldb_ipinfo, type, lookup);
+    result = mysqldb_find_datalist(datanode, &mysqldb_ipinfo, type, lookup);
 	return result;
 }
 
@@ -599,7 +600,7 @@ static isc_result_t mysqldb_find_res(const char *zone, const char *domain_name,
 static isc_result_t mysqldb_lookup(const char *zone, const char *name, void *dbdata,
 	                           	dns_sdblookup_t *lookup, dns_clientinfomethods_t *methods,
 		       		dns_clientinfo_t *clientinfo,void *ip_info,dns_rdatatype_t type, void *zone_data){
-	isc_result_t result = (ISC_R_FAILURE);
+	isc_result_t result = ISC_R_FAILURE;
 	mysqldb_zonedata_t *mysqldb_zonedata = zone_data;
 	isc_sockaddr_t *sip = ip_info;
 
@@ -619,64 +620,71 @@ static isc_result_t mysqldb_lookup(const char *zone, const char *name, void *dbd
  */
 static isc_result_t mysqldb_allnodes(const char *zone, void *dbdata, dns_sdballnodes_t *allnodes)
 {
-    struct dbinfo *dbi = dbdata;
-    isc_result_t result;
-    MYSQL_RES *res = 0;
-    MYSQL_ROW row;
-    char str[1500];
+	struct dbinfo *dbi = dbdata;
+	isc_result_t result;
+	MYSQL_RES *res = 0;
+	MYSQL_ROW row;
+	char str[1500];
+	char tbl_name[255];
 
-    UNUSED(zone);
-    snprintf(str, sizeof(str),
-     "SELECT ttl, name, rdtype_id, rdata FROM `%s` WHERE flag=1 ORDER BY name",
-     dbi->table);
-    
-    result = maybe_reconnect(dbi);
-    if (result != ISC_R_SUCCESS){
-        isc_log_write(dns_lctx, DNS_LOGCATEGORY_DATABASE,
-                      DNS_LOGMODULE_MYSQL, ISC_LOG_ERROR,
-                      "Mysql driver allnodes() Cannot connect to database: '%s' '%s'",
-                      dbi->database,dbi->table);
-        return result;
-    }
-    if( mysql_query(&dbi->conn, str) != 0  ){
-        isc_log_write(dns_lctx, DNS_LOGCATEGORY_DATABASE,
-                      DNS_LOGMODULE_MYSQL, ISC_LOG_ERROR,
-                      "There is an error when query '%s' for Mysql driver allnodes() ",
-                       str);
-        return (ISC_R_FAILURE);
-    }
-    res = mysql_store_result(&dbi->conn);
+	UNUSED(zone);
 
-    if (mysql_num_rows(res) == 0){
-        mysql_free_result(res);
-        return (ISC_R_NOTFOUND);
-    }
-    while ((row = mysql_fetch_row(res))) {
-        char *ttlstr = row[0];
-        char *name   = row[1];
-        char *typestr  = row[2];
-        char *data   = row[3];
-        dns_ttl_t ttl;
+	result = maybe_reconnect(dbi);
+	if (result != ISC_R_SUCCESS){
+		isc_log_write(dns_lctx, DNS_LOGCATEGORY_DATABASE,
+			      DNS_LOGMODULE_MYSQL, ISC_LOG_ERROR,
+			      "Mysql driver allnodes() Cannot connect to database: '%s' '%s:(user %s passwd %s)'",
+			      dbi->database, dbi->host, dbi->user, dbi->passwd);
+		return result;
+	}
+
+	if(trans_zone_into_dbname(&dbi->conn, zone, tbl_name) == (ISC_R_FAILURE)){
+		return (ISC_R_FAILURE);
+	}
+	
+	snprintf(str, sizeof(str), "SELECT ttl, name, rdtype_id, rdata FROM `%s` WHERE flag=1 ORDER BY name", tbl_name);
+	
+	if( mysql_query(&dbi->conn, str) != 0 ){
+		isc_log_write(dns_lctx, DNS_LOGCATEGORY_DATABASE,
+			      DNS_LOGMODULE_MYSQL, ISC_LOG_ERROR,
+			      "There is an error when query '%s' for Mysql driver allnodes() ",
+			      str);
+		return (ISC_R_FAILURE);
+	}
+	res = mysql_store_result(&dbi->conn);
+
+	if (mysql_num_rows(res) == 0){
+		mysql_free_result(res);
+		return (ISC_R_NOTFOUND);
+	}
+
+	while ((row = mysql_fetch_row(res))){
+		char *ttlstr = row[0];
+		char *name   = row[1];
+		char *typestr   = row[2];
+		char *data   = row[3];
+		dns_ttl_t ttl;
         dns_rdatatype_t rdtype;
-        char *endp;
-        ttl = strtol(ttlstr, &endp, 10);
+		char *endp;
+		ttl = strtol(ttlstr, &endp, 10);
         rdtype = strtol(typestr, &endp, 10);
-        if (*endp != '\0'){
-            mysql_free_result(res);
-            return (DNS_R_BADTTL);
-        }
-        char rdtype_str[sizeof("TYPE65536")];
-        result = mysqldb_return_typestr(rdtype, rdtype_str);
-        if(result == ISC_R_SUCCESS){
-            result = dns_sdb_putnamedrr(allnodes, name, rdtype_str, ttl, data);
-        }
-        if (result != ISC_R_SUCCESS) {
-            mysql_free_result(res);
-            return (ISC_R_FAILURE);
-        }
-    }
-    mysql_free_result(res);
-    return (ISC_R_SUCCESS);
+		if (*endp != '\0'){
+		    mysql_free_result(res);
+		    return (DNS_R_BADTTL);
+		}
+
+	    char rdtype_str[sizeof("TYPE65536")];
+	    result = mysqldb_return_typestr(rdtype, rdtype_str);
+	    if(result == ISC_R_SUCCESS){
+ 		    result = dns_sdb_putnamedrr(allnodes, name, rdtype_str, ttl, data);
+	    }
+		if (result != ISC_R_SUCCESS) {
+		    mysql_free_result(res);
+		    return (ISC_R_FAILURE);
+		}
+	}
+	mysql_free_result(res);
+	return (ISC_R_SUCCESS);
 }
 
 /*
@@ -684,72 +692,17 @@ static isc_result_t mysqldb_allnodes(const char *zone, void *dbdata, dns_sdballn
  * in dbdata.
  *
  * argv[0] is the name of the database
- * argv[1] is the name of the table
- * argv[2] (if present) is the name of the host to connect to
- * argv[3] (if present) is the name of the user to connect as
- * argv[4] (if present) is the name of the password to connect with
+ * argv[1] (if present) is the name of the host to connect to
+ * argv[2] (if present) is the name of the user to connect as
+ * argv[3] (if present) is the name of the password to connect with
  */
 static isc_result_t mysqldb_create(const char *zone, int argc, char **argv,
-	                           void *driverdata, void **dbdata) {
-    struct dbinfo *dbi;
-	isc_result_t result;
-
+	                           void *driverdata, void **dbdata)
+{
 	UNUSED(zone);
-    UNUSED(driverdata);
+	UNUSED(driverdata);
 
-    if (argc < 2){
-		isc_log_write(dns_lctx, DNS_LOGCATEGORY_DATABASE,
-			      DNS_LOGMODULE_MYSQL, ISC_LOG_ERROR,
-			      "Mysql driver requires more than 2 args.");
-		return (ISC_R_FAILURE);
-	}
-	dbi = isc_mem_get(ns_g_mctx, sizeof(struct dbinfo));
-	if (dbi == NULL){
-		isc_log_write(dns_lctx, DNS_LOGCATEGORY_DATABASE,
-			      DNS_LOGMODULE_MYSQL, ISC_LOG_ERROR,
-			      "There is no memery for Mysql driver creation.");
-		return (ISC_R_NOMEMORY);
-
-	}
-	    
-	dbi->database = NULL;
-	dbi->table    = NULL;
-	dbi->host     = NULL;
-	dbi->user     = NULL;
-	dbi->passwd   = NULL;
-
-	dbi->zone_info.source_ip = 0;
-	dbi->zone_info.idc_id = 0;
-	dbi->zone_info.isp_id = 0;
-	dbi->zone_info.location_id = 0;
-
-	memcpy(dbi->zone_info.zone,"\0",sizeof(dbi->zone_info.zone));
-
-#define STRDUP_OR_FAIL(target, source)			\
-	do {							\
-		target = isc_mem_strdup(ns_g_mctx, source);	\
-		if (target == NULL) {				                \
-			result = ISC_R_NOMEMORY;		        \
-			goto cleanup;				\
-		}						\
-	} while (0);
-
-	STRDUP_OR_FAIL(dbi->database, argv[0]);
-	STRDUP_OR_FAIL(dbi->table,    argv[1]);
-	STRDUP_OR_FAIL(dbi->host,     argv[2]);
-	STRDUP_OR_FAIL(dbi->user,     argv[3]);
-	STRDUP_OR_FAIL(dbi->passwd,   argv[4]);
-
-	result = db_connect(dbi);
-	if (result != ISC_R_SUCCESS)
-	    goto cleanup;
-
-	*dbdata = dbi;
-	return (ISC_R_SUCCESS);
-
-cleanup:
-	mysqldb_destroy(zone, driverdata, (void **)&dbi, NULL);
-	return result;
+	return dbi_init(driverdata, (struct dbinfo **)dbdata, argc, argv);
 }
 
 static void mysqldb_zonedata_destroy(mysqldb_zonedata_t *zone_data){
@@ -800,15 +753,13 @@ static void mysqldb_destroy(const char *zone, void *driverdata, void **dbdata, v
 	if(dbi){
 		mysql_close(&dbi->conn);
 		if (dbi->database != NULL)
-		    isc_mem_free(ns_g_mctx, dbi->database);
-		if (dbi->table != NULL)
-		    isc_mem_free(ns_g_mctx, dbi->table);
+			isc_mem_free(ns_g_mctx, dbi->database);
 		if (dbi->host != NULL)
-		    isc_mem_free(ns_g_mctx, dbi->host);
+			isc_mem_free(ns_g_mctx, dbi->host);
 		if (dbi->user != NULL)
-		    isc_mem_free(ns_g_mctx, dbi->user);
+			isc_mem_free(ns_g_mctx, dbi->user);
 		if (dbi->passwd != NULL)
-		    isc_mem_free(ns_g_mctx, dbi->passwd);
+			isc_mem_free(ns_g_mctx, dbi->passwd);
 
 		isc_mem_put(ns_g_mctx, dbi, sizeof(struct dbinfo));
 	}
@@ -816,7 +767,7 @@ static void mysqldb_destroy(const char *zone, void *driverdata, void **dbdata, v
 	
 }
 
-static isc_result_t mysqldb_zdata(const char *zone, void *driverdata, void **m_zone_data);
+static isc_result_t mysqldb_zdata(const char *zone, int argc, char **argv, void *driverdata, void **m_zone_data);
 
 static isc_result_t mysqldb_zdupdate(const char *zone, const char *domain, void *driverdata, void **m_zone_data);
 
@@ -826,9 +777,9 @@ static isc_result_t mysqldb_zdupdate(const char *zone, const char *domain, void 
  * is NULL.
  */
 static dns_sdbmethods_t mysqldb_methods = {
-    mysqldb_lookup,
+	mysqldb_lookup,
 	NULL, /* authority */
-    mysqldb_allnodes,
+	mysqldb_allnodes,
 	mysqldb_create,
 	mysqldb_destroy,
 	NULL,/* lookup2 */
@@ -868,9 +819,6 @@ typedef isc_result_t (*mysqldb_addfunc_t)(void *, const char *, const dns_ttl_t 
 #define LIST_TAIL(node,link) \
 	while(node->link){node = node->link;} 
 	
-static isc_result_t trans_zone_into_dbname(MYSQL *conn, const char *zone, char *tbl_name);
-static int split_qname_by_dot(const char *qname, char **split_name);
-static isc_result_t mysqldb_default_dbinfo_init(isc_mem_t *mctx, struct dbinfo *dbi) ;
 static isc_result_t mysqldb_zonedata_create(isc_mem_t *mctx, mysqldb_zonedata_t **zonedata);
 static isc_result_t insert_to_hashtable(isc_mem_t *mctx, mysqldb_datanode_t **hashtbl, unsigned int hashval,
 									const char *domain, const dns_ttl_t ttl, const dns_rdataclass_t rdtype,
@@ -910,30 +858,81 @@ static void dbi_destroy(isc_mem_t *mctx ,struct dbinfo *dbi){
 /*
   * Initialize database information
   */
-static isc_result_t dbi_init(void *driverdata, struct dbinfo **dbi){
+static isc_result_t dbi_init(void *driverdata, struct dbinfo **dbdata, int argc, char **argv){
 	isc_result_t result;
+	struct dbinfo *dbi;
 	
 	if(driverdata != NULL){
-		*dbi = driverdata;
+		*dbdata = driverdata;
+
+		isc_log_write(dns_lctx, DNS_LOGCATEGORY_DATABASE,
+			      DNS_LOGMODULE_MYSQL, ISC_LOG_DEBUG(3),
+			      "The point to driverdata is not NULL in the function dbi_init.");
+		
 		return (ISC_R_SUCCESS);
 	}
 
-	*dbi = isc_mem_get(ns_g_mctx, sizeof(struct dbinfo));
-	if(*dbi == NULL)
+	if (argc < 2){
+		isc_log_write(dns_lctx, DNS_LOGCATEGORY_DATABASE,
+			      DNS_LOGMODULE_MYSQL, ISC_LOG_ERROR,
+			      "Mysql driver requires more than 2 args.");
+		return (ISC_R_FAILURE);
+	}
+	dbi = isc_mem_get(ns_g_mctx, sizeof(struct dbinfo));
+	if (dbi == NULL){
+		isc_log_write(dns_lctx, DNS_LOGCATEGORY_DATABASE,
+			      DNS_LOGMODULE_MYSQL, ISC_LOG_ERROR,
+			      "There is no memery for Mysql driver creation.");
 		return (ISC_R_NOMEMORY);
-
-	result = mysqldb_default_dbinfo_init(ns_g_mctx, *dbi);
-	if(result != ISC_R_SUCCESS){
-		isc_mem_put(ns_g_mctx,*dbi,sizeof(struct dbinfo));
-		return result;
 	}
-	result = db_connect(*dbi);
 	
-	if(result != ISC_R_SUCCESS){
-		dbi_destroy(ns_g_mctx, *dbi);
-		return result;
+	dbi->database = NULL;
+	dbi->host     = NULL;
+	dbi->user     = NULL;
+	dbi->passwd   = NULL;
+
+	dbi->zone_info.source_ip = 0;
+	dbi->zone_info.idc_id = 0;
+	dbi->zone_info.isp_id = 0;
+	dbi->zone_info.location_id = 0;
+
+	memcpy(dbi->zone_info.zone,"\0",sizeof(dbi->zone_info.zone));
+
+#define STRDUP_OR_FAIL(target, source)			\
+	do {							\
+		target = isc_mem_strdup(ns_g_mctx, source);	\
+		if (target == NULL) {				                \
+			result = ISC_R_NOMEMORY;		        \
+			goto cleanup;				\
+		}						\
+	} while (0);
+
+	STRDUP_OR_FAIL(dbi->database, argv[0]);
+	STRDUP_OR_FAIL(dbi->host,     argv[1]);
+	STRDUP_OR_FAIL(dbi->user,     argv[2]);
+	STRDUP_OR_FAIL(dbi->passwd,   argv[3]);
+
+	result = db_connect(dbi);
+	if (result != ISC_R_SUCCESS){
+		isc_log_write(dns_lctx, DNS_LOGCATEGORY_DATABASE,
+			      DNS_LOGMODULE_MYSQL, ISC_LOG_ERROR,
+			      "There is an error when connect MysqlDb(%s:3306 %s) user(%s) pssword(%s).",
+			      dbi->host, dbi->database, dbi->user, dbi->passwd);
+		goto cleanup;
 	}
-	return (ISC_R_ADDITIONALMEM);
+
+	*dbdata = dbi;
+
+	isc_log_write(dns_lctx, DNS_LOGCATEGORY_DATABASE,
+		      DNS_LOGMODULE_MYSQL, ISC_LOG_DEBUG(7),
+		      "Connecting MysqlDb(%s:3306 %s) user(%s) pssword(%s) successfully.",
+		      dbi->host, dbi->database, dbi->user, dbi->passwd);
+	
+	return (ISC_R_SUCCESS);
+
+cleanup:
+	mysqldb_destroy(NULL, driverdata, (void **)&dbi, NULL);
+	return result;
 }
 
 
@@ -947,25 +946,29 @@ static isc_result_t dbi_init(void *driverdata, struct dbinfo **dbi){
  * return - result : the value of ISC_R_SUCCESS is meaning cacheing successfully.
  *			      the value of ISC_R_FAILURE is meaning error or table not existing.
  */
-static isc_result_t mysqldb_zdata(const char *zone, void *driverdata, void **m_zone_data){
+static isc_result_t mysqldb_zdata(const char *zone, int argc, char **argv, void *driverdata, void **m_zone_data){
 	struct dbinfo *dbi;
-	mysqldb_zonedata_t *zone_data;
+	void *zone_data;
 	isc_result_t result;
 	char tbl_name[255];
 	MYSQL_RES *res=0;
 	int row;
 	int get_dbi_flag = 0;
+
+	isc_log_write(dns_lctx, DNS_LOGCATEGORY_DATABASE,
+		      DNS_LOGMODULE_MYSQL, ISC_LOG_INFO,
+		      "Updating zone data (%s).", zone);
 	
 	/*
 	  * Make the Hash Table structure.
 	  */
-	result = mysqldb_zonedata_create(ns_g_mctx, &zone_data);
+	result = mysqldb_zonedata_create(ns_g_mctx, (mysqldb_zonedata_t **)(&zone_data));
 	if(result != ISC_R_SUCCESS)
 		return result;
 	
 	*m_zone_data = zone_data;
 	
-	result = dbi_init(driverdata, &dbi);
+	result = dbi_init(driverdata, &dbi, argc, argv);
 	if(result == ISC_R_ADDITIONALMEM)
 		get_dbi_flag = 1;
 	else if(result != ISC_R_SUCCESS)
@@ -1029,7 +1032,7 @@ static isc_result_t insert_tbldata_intohashtbl(MYSQL_RES *res, void *zone_data, 
 	isc_result_t result;
 	
 	while((tmp = mysql_fetch_row(res)) != NULL){
-	    domain = tmp[0];
+		domain = tmp[0];
 		ttlstr = tmp[1];
 	    rdata   = tmp[2];
 		type_str = tmp[3];
@@ -1047,7 +1050,7 @@ static isc_result_t insert_tbldata_intohashtbl(MYSQL_RES *res, void *zone_data, 
 		idc = strtol(idc_str, &endp, 10);
 		
 		if (*endp != '\0'){
-	    	isc_log_write(dns_lctx, DNS_LOGCATEGORY_DATABASE,
+	        isc_log_write(dns_lctx, DNS_LOGCATEGORY_DATABASE,
 			      DNS_LOGMODULE_MYSQL, ISC_LOG_ERROR,
 			      "There is a error of TLL '%s' or TYPE_ID '%s'",
 			      ttlstr,type_str);
@@ -1093,7 +1096,7 @@ static isc_result_t mysqldb_zdupdate(const char *zone, const char *domain, void 
 		mysqldb_zonedata_t *new_zone_data = NULL;
 		mysqldb_zonedata_t *old_zone_data = NULL;
 		old_zone_data = zone_data;
-		result = mysqldb_zdata(zone, driverdata, &new_zone_data);
+		result = mysqldb_zdata(zone, 0, NULL, driverdata, (void **)(&new_zone_data));
 		if(result == ISC_R_SUCCESS){
 			*m_zone_data = new_zone_data;
 			mysqldb_zonedata_destroy(old_zone_data);
@@ -1114,7 +1117,7 @@ static isc_result_t mysqldb_zdupdate(const char *zone, const char *domain, void 
 /*
   * Initialize database information
   */
-	result = dbi_init(driverdata, &dbi);
+	result = dbi_init(driverdata, &dbi, 0, NULL);
 	if(result == ISC_R_ADDITIONALMEM)
 		get_dbi_flag = 1;
 	else if(result != ISC_R_SUCCESS)
@@ -1447,7 +1450,6 @@ static isc_result_t mysqldb_add_nodeanddata(void *m_datanode,
 		mysqldb_datanode_init(datanode, domain, ttl, rdtype, isp, location, idc, rdata);
 	}else{
 		mysqldb_datainfo_t *datainfo;
-			
 		result = mysqldb_datainfo_create(ns_g_mctx, &datainfo);
 		if(result != ISC_R_SUCCESS)
 			return result;
@@ -1466,7 +1468,7 @@ static isc_result_t mysqldb_add_nodeanddata(void *m_datanode,
 /*Create zone data structure.
  *
  * args  -    mctx : link of memory for BIND memory manager
- *	   zone_data : the zonedata structure for returning   
+ *	   zone_data : the zonedata structure for returning
  *
  * return - result : the value of ISC_R_SUCCESS is meaning creating successfully.
  *			      the value of ISC_R_FAILURE is meaning error.
@@ -1493,54 +1495,6 @@ static isc_result_t mysqldb_zonedata_create(isc_mem_t *mctx, mysqldb_zonedata_t 
 
 	memset((*zonedata)->hashtable, 0, bytes);
 	
-	return (ISC_R_SUCCESS);
-}
-
-/*
-  * Mysql Database default connection information
-*/
-#define DB_NAME	"mysql_bind"
-#define DB_HOST "localhost"
-#define DB_USER "root"
-#define DB_PASSWD ""
-
-/*
- * Initialize default datase information by defination
-*/
-static isc_result_t mysqldb_default_dbinfo_init(isc_mem_t *mctx, struct dbinfo *dbi) {
-	if(mctx == NULL || dbi == NULL)
-		return (ISC_R_FAILURE);
-	
-	dbi->database = isc_mem_get(mctx, 30*sizeof(char));
-	if(dbi->database == NULL)
-		return (ISC_R_NOMEMORY);
-	
-	dbi->host = isc_mem_get(mctx, 30*sizeof(char));
-	if(dbi->host == NULL){
-		isc_mem_put(mctx,dbi->database,30*sizeof(char));
-		return (ISC_R_NOMEMORY);
-	}
-
-	dbi->user = isc_mem_get(mctx, 30*sizeof(char));
-	if(dbi->user == NULL){
-		isc_mem_put(mctx,dbi->database,30*sizeof(char));
-		isc_mem_put(mctx,dbi->host,30*sizeof(char));
-		return (ISC_R_NOMEMORY);
-	}
-
-	dbi->passwd = isc_mem_get(mctx, 30*sizeof(char));
-	if(dbi->passwd == NULL){
-		isc_mem_put(mctx,dbi->database,30*sizeof(char));
-		isc_mem_put(mctx,dbi->host,30*sizeof(char));
-		isc_mem_put(mctx,dbi->user,30*sizeof(char));
-		return (ISC_R_NOMEMORY);
-	}
-
-	strncpy(dbi->database, DB_NAME,30);
-	strncpy(dbi->host, DB_HOST,30);
-	strncpy(dbi->user, DB_USER,30);
-	strncpy(dbi->passwd, DB_PASSWD,30);
-
 	return (ISC_R_SUCCESS);
 }
 
@@ -1630,15 +1584,20 @@ static MYSQL_RES *mysqldb_return_zonedata_res(MYSQL *conn, const char *tbl_name,
 	
 	memset(str, '\0', sizeof(str));
 
-	snprintf(str, sizeof(str),"SELECT name,ttl, rdata,rdtype_id,isp_id,location_id,idc_id FROM `%s` WHERE flag=1 order  by name", tbl_name);
+	snprintf(str, sizeof(str),"SELECT name,ttl,rdata,rdtype_id,isp_id,location_id,idc_id FROM `%s` WHERE flag=1 order by name", tbl_name);
 	if(wherestr != NULL)
 		strcat(str, wherestr);
 	
+	isc_log_write(dns_lctx, DNS_LOGCATEGORY_DATABASE,
+        DNS_LOGMODULE_MYSQL, ISC_LOG_DEBUG(5),
+		"The SQL statement is '%s' in function (%s)",
+		str,__func__);
 	if( mysql_query(conn, str) != 0 ){
         isc_log_write(dns_lctx, DNS_LOGCATEGORY_DATABASE,
-	        DNS_LOGMODULE_MYSQL, ISC_LOG_ERROR,
-		    "There is an error when query '%s' in '%s'",
-		    str,__func__);
+			      DNS_LOGMODULE_MYSQL, ISC_LOG_ERROR,
+			      "There is an error when query '%s' in '%s'",
+			      str,__func__);
+	
 	     memset(str, '\0', sizeof(str));
 	     return 0;
     }
@@ -1646,16 +1605,16 @@ static MYSQL_RES *mysqldb_return_zonedata_res(MYSQL *conn, const char *tbl_name,
 	res = mysql_store_result(conn);
 
     if (mysql_num_rows(res) <= 0){
-		mysql_free_result(res);
-		res = 0;
-		isc_log_write(dns_lctx, DNS_LOGCATEGORY_DATABASE,
-			      DNS_LOGMODULE_MYSQL, ISC_LOG_DEBUG(3),
-			      "There is no records when query '%s' in '%s'",
-			      str,__func__);
+	    mysql_free_result(res);
+	    res = 0;
+	    isc_log_write(dns_lctx, DNS_LOGCATEGORY_DATABASE,
+		      DNS_LOGMODULE_MYSQL, ISC_LOG_DEBUG(3),
+		      "There is no records when query '%s' in '%s'",
+		      str,__func__);
 		
-		memset(str, '\0', sizeof(str));
-		return 0;
-    }
+        memset(str, '\0', sizeof(str));
+	    return 0;
+   	}
 	
 	memset(str, '\0', sizeof(str));
 	return res;

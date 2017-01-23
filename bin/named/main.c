@@ -97,6 +97,7 @@
 #define BACKTRACE_MAXFRAME 128
 #endif
 
+#include <named/mysqlip.h>
 #include <named/mysqldb.h>
 
 static isc_boolean_t	want_stats = ISC_FALSE;
@@ -925,6 +926,7 @@ cleanup(void) {
 	ns_server_destroy(&ns_g_server);
 
 	mysqldb_clear();
+	mysqldb_clear_radix_tree_array(ns_g_mctx, NULL, 0);
 	ns_builtin_deinit();
 
 	/*

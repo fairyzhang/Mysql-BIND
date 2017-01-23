@@ -555,6 +555,9 @@ findnodeext(dns_db_t *db, dns_name_t *name, isc_boolean_t create,
 	REQUIRE(VALID_SDLZDB(sdlz));
 	REQUIRE(nodep != NULL && *nodep == NULL);
 
+	UNUSED(ip_info);
+	UNUSED(type);
+	
 	if (sdlz->dlzimp->methods->newversion == NULL) {
 		REQUIRE(create == ISC_FALSE);
 	}
@@ -1413,8 +1416,7 @@ static dns_rdatasetmethods_t rdataset_methods = {
 	NULL,
 	NULL,
 	NULL,
-	NULL,
-	NULL	/* update */
+	NULL
 };
 
 static void

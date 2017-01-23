@@ -110,6 +110,7 @@
 #include <named/ns_smf_globals.h>
 #include <stdlib.h>
 #endif
+#include <named/mysqlip.h>
 
 #ifndef PATH_MAX
 #define PATH_MAX 1024
@@ -4560,6 +4561,7 @@ load_configuration(const char *filename, ns_server_t *server,
 	const cfg_obj_t *options;
 	const cfg_obj_t *usev4ports, *avoidv4ports, *usev6ports, *avoidv6ports;
 	const cfg_obj_t *views;
+	const cfg_obj_t *mysqlip;
 	dns_view_t *view = NULL;
 	dns_view_t *view_next;
 	dns_viewlist_t tmpviewlist;
@@ -5169,6 +5171,35 @@ load_configuration(const char *filename, ns_server_t *server,
 				     ns_g_aclconfctx),
 	       "binding control channel(s)");
 
+	/*
+	  * Init IP table of mysql database
+	  */
+	mysqlip = NULL;
+	if (cfg_map_get(config, "mysqlipdb", &mysqlip) == ISC_R_SUCCESS){
+		dns_mysqlip_t *ipinfo;
+		result = mysqlip_set_info(ns_g_mctx, mysqlip, &ipinfo);
+		if(result != ISC_R_SUCCESS){
+			isc_log_write(ns_g_lctx,
+				NS_LOGCATEGORY_GENERAL,
+				NS_LOGMODULE_SERVER,
+				ISC_LOG_ERROR,
+				"There is an error while setting ipinfo configuration.");
+		}else{
+			result = mysqlip_init_radix_array(ns_g_mctx, ipinfo);
+			if(result != ISC_R_SUCCESS){
+				isc_log_write(ns_g_lctx,
+					NS_LOGCATEGORY_GENERAL,
+					NS_LOGMODULE_SERVER,
+					ISC_LOG_ERROR,
+					"There is an error while initializing ip radix array of database");
+			}
+			isc_log_write(ns_g_lctx,
+				NS_LOGCATEGORY_GENERAL,
+				NS_LOGMODULE_SERVER,
+				ISC_LOG_INFO,
+				"load MysqlIP DB successfully.");
+		}
+	}
 	/*
 	 * Bind the lwresd port(s).
 	 */
