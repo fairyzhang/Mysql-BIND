@@ -1217,7 +1217,7 @@ query_addadditional(void *arg, dns_name_t *name, dns_rdatatype_t qtype) {
 	result = dns_db_findext(db, name, version, type,
 				client->query.dboptions,
 				client->now, &node, fname, &cm, &ci,
-				rdataset, sigrdataset, &client->ipinfo);
+				rdataset, sigrdataset, &client->peeraddr);
 	if (result == ISC_R_SUCCESS) {
 		if (sigrdataset != NULL && !dns_db_issecure(db) &&
 		    dns_rdataset_isassociated(sigrdataset))
@@ -1257,7 +1257,7 @@ query_addadditional(void *arg, dns_name_t *name, dns_rdatatype_t qtype) {
 				client->query.dboptions |
 				 DNS_DBFIND_GLUEOK | DNS_DBFIND_ADDITIONALOK,
 				client->now, &node, fname, &cm, &ci,
-				rdataset, sigrdataset, &client->ipinfo);
+				rdataset, sigrdataset, &client->peeraddr);
 	if (result == DNS_R_GLUE &&
 	    validate(client, db, fname, rdataset, sigrdataset))
 		result = ISC_R_SUCCESS;
@@ -1303,7 +1303,7 @@ query_addadditional(void *arg, dns_name_t *name, dns_rdatatype_t qtype) {
 	result = dns_db_findext(db, name, version, type,
 				client->query.dboptions | DNS_DBFIND_GLUEOK,
 				client->now, &node, fname, &cm, &ci,
-				rdataset, sigrdataset, &client->ipinfo);
+				rdataset, sigrdataset, &client->peeraddr);
 	if (!(result == ISC_R_SUCCESS ||
 	      result == DNS_R_ZONECUT ||
 	      result == DNS_R_GLUE))
@@ -1750,7 +1750,7 @@ query_addadditional2(void *arg, dns_name_t *name, dns_rdatatype_t qtype) {
 	result = dns_db_findext(db, name, version, type,
 				client->query.dboptions,
 				client->now, &node, fname, &cm, &ci,
-				NULL, NULL, &client->ipinfo);
+				NULL, NULL, &client->peeraddr);
 	if (result == ISC_R_SUCCESS)
 		goto found;
 
@@ -1781,7 +1781,7 @@ query_addadditional2(void *arg, dns_name_t *name, dns_rdatatype_t qtype) {
 				client->query.dboptions |
 				 DNS_DBFIND_GLUEOK | DNS_DBFIND_ADDITIONALOK,
 				client->now, &node, fname, &cm, &ci,
-				NULL, NULL, &client->ipinfo);
+				NULL, NULL, &client->peeraddr);
 	if (result == ISC_R_SUCCESS)
 		goto found;
 
@@ -1853,7 +1853,7 @@ query_addadditional2(void *arg, dns_name_t *name, dns_rdatatype_t qtype) {
 	result = dns_db_findext(db, name, version, type,
 				client->query.dboptions | DNS_DBFIND_GLUEOK,
 				client->now, &node, fname, &cm, &ci,
-				NULL, NULL, &client->ipinfo);
+				NULL, NULL, &client->peeraddr);
 	if (!(result == ISC_R_SUCCESS ||
 	      result == DNS_R_ZONECUT ||
 	      result == DNS_R_GLUE)) {
@@ -2562,7 +2562,7 @@ query_addsoa(ns_client_t *client, dns_db_t *db, dns_dbversion_t *version,
 
 		result = dns_db_findext(db, name, version, dns_rdatatype_soa,
 					client->query.dboptions, 0, &node,
-					fname, &cm, &ci, rdataset, sigrdataset, &client->ipinfo);
+					fname, &cm, &ci, rdataset, sigrdataset, &client->peeraddr);
 	}
 	if (result != ISC_R_SUCCESS) {
 		/*
@@ -2680,7 +2680,7 @@ query_addns(ns_client_t *client, dns_db_t *db, dns_dbversion_t *version) {
 		CTRACE("query_addns: calling dns_db_find");
 		result = dns_db_findext(db, name, NULL, dns_rdatatype_ns,
 					client->query.dboptions, 0, &node,
-					fname, &cm, &ci, rdataset, sigrdataset, &client->ipinfo);
+					fname, &cm, &ci, rdataset, sigrdataset, &client->peeraddr);
 		CTRACE("query_addns: dns_db_find complete");
 	}
 	if (result != ISC_R_SUCCESS) {
@@ -3033,7 +3033,7 @@ query_addbestns(ns_client_t *client) {
 					dns_rdatatype_ns,
 					client->query.dboptions,
 					client->now, &node, fname,
-					&cm, &ci, rdataset, sigrdataset, &client->ipinfo);
+					&cm, &ci, rdataset, sigrdataset, &client->peeraddr);
 		if (result != DNS_R_DELEGATION)
 			goto cleanup;
 		if (USECACHE(client)) {
@@ -3375,7 +3375,7 @@ query_addwildcardproof(ns_client_t *client, dns_db_t *db,
 
 	result = dns_db_findext(db, name, version, dns_rdatatype_nsec,
 				options, 0, &node, fname, &cm, &ci,
-				rdataset, sigrdataset, &client->ipinfo);
+				rdataset, sigrdataset, &client->peeraddr);
 	if (node != NULL)
 		dns_db_detachnode(db, &node);
 
@@ -3400,7 +3400,7 @@ query_addwildcardproof(ns_client_t *client, dns_db_t *db,
 			result = dns_db_findext(db, cname, version,
 						dns_rdatatype_nsec,
 						options, 0, NULL, fname,
-						&cm, &ci, NULL, NULL, &client->ipinfo);
+						&cm, &ci, NULL, NULL, &client->peeraddr);
 		}
 		/*
 		 * Add closest (provable) encloser NSEC3.
@@ -4196,7 +4196,7 @@ rpz_find(ns_client_t *client, dns_rdatatype_t qtype, dns_name_t *qnamef,
 	found = dns_fixedname_name(&fixed);
 	result = dns_db_findext(*dbp, qnamef, *versionp, dns_rdatatype_any, 0,
 				client->now, nodep, found, &cm, &ci,
-				*rdatasetp, NULL, &client->ipinfo);
+				*rdatasetp, NULL, &client->peeraddr);
 	if (result == ISC_R_SUCCESS) {
 		dns_rdatasetiter_t *rdsiter;
 
@@ -4243,7 +4243,7 @@ rpz_find(ns_client_t *client, dns_rdatatype_t qtype, dns_name_t *qnamef,
 				result = dns_db_findext(*dbp, qnamef, *versionp,
 							qtype, 0, client->now,
 							nodep, found, &cm, &ci,
-							*rdatasetp, NULL,&client->ipinfo);
+							*rdatasetp, NULL, &client->peeraddr);
 		}
 	}
 	switch (result) {
@@ -5179,7 +5179,7 @@ query_findclosestnsec3(dns_name_t *qname, dns_db_t *db,
 	dboptions = client->query.dboptions | DNS_DBFIND_FORCENSEC3;
 	result = dns_db_findext(db, dns_fixedname_name(&fixed), version,
 				dns_rdatatype_nsec3, dboptions, client->now,
-				NULL, fname, &cm, &ci, rdataset, sigrdataset, &client->ipinfo);
+				NULL, fname, &cm, &ci, rdataset, sigrdataset, &client->peeraddr);
 
 	if (result == DNS_R_NXDOMAIN) {
 		if (!dns_rdataset_isassociated(rdataset)) {
@@ -5434,7 +5434,7 @@ redirect(ns_client_t *client, dns_name_t *name, dns_rdataset_t *rdataset,
 }
 
 static inline void
-log_end_query(ns_client_t *client);
+log_end_query(ns_client_t *client) ;
 
 /*
  * Do the bulk of query processing for the current query of 'client'.
@@ -5747,7 +5747,7 @@ query_find(ns_client_t *client, dns_fetchevent_t *event, dns_rdatatype_t qtype)
 	 */
 	result = dns_db_findext(db, client->query.qname, version, type,
 				client->query.dboptions, client->now,
-				&node, fname, &cm, &ci, rdataset, sigrdataset, &client->ipinfo);
+				&node, fname, &cm, &ci, rdataset, sigrdataset, &client->peeraddr);
 
  resume:
 	CTRACE("query_find: resume");
@@ -6025,7 +6025,7 @@ query_find(ns_client_t *client, dns_fetchevent_t *event, dns_rdatatype_t qtype)
 						NULL, dns_rdatatype_ns,
 						0, client->now, &node,
 						fname, &cm, &ci,
-						rdataset, sigrdataset, &client->ipinfo);
+						rdataset, sigrdataset, &client->peeraddr);
 		}
 		if (result != ISC_R_SUCCESS) {
 			/*
@@ -7335,6 +7335,7 @@ query_find(ns_client_t *client, dns_fetchevent_t *event, dns_rdatatype_t qtype)
 		
 		log_end_query(client);
 		query_send(client);
+		
 		ns_client_detach(&client);
 	}
 	CTRACE("query_find: done");
@@ -7399,7 +7400,7 @@ log_query(ns_client_t *client, unsigned int flags, unsigned int extflags) {
 	isc_netaddr_format(&client->destaddr, onbuf, sizeof(onbuf));
 
 	ns_client_log(client, NS_LOGCATEGORY_QUERIES, NS_LOGMODULE_QUERY,
-		      level, "query: %s %s %s %s%s%s%s%s%s (%s) (info: isp %d location %d idc %d)", namebuf,
+		      level, "query: %s %s %s %s%s%s%s%s%s (%s) ", namebuf,
 		      classname, typename, WANTRECURSION(client) ? "+" : "-",
 		      (client->signer != NULL) ? "S": "",
 		      (client->opt != NULL) ? "E" : "",
@@ -7407,8 +7408,7 @@ log_query(ns_client_t *client, unsigned int flags, unsigned int extflags) {
 				 "T" : "",
 		      ((extflags & DNS_MESSAGEEXTFLAG_DO) != 0) ? "D" : "",
 		      ((flags & DNS_MESSAGEFLAG_CD) != 0) ? "C" : "",
-		      onbuf,
-		      client->ipinfo.isp_id, client->ipinfo.location_id, client->ipinfo.idc_id);
+		      onbuf);
 }
 
 static inline void
@@ -7539,16 +7539,6 @@ ns_query_start(ns_client_t *client) {
 			query_error(client, result, __LINE__);
 		return;
 	}
-	//Locate IP Information for Intelligent DNS
-	if(locate_ip_information(client->query.qname, &client->peeraddr, &client->ipinfo.isp_id, 
-				&client->ipinfo.location_id, &client->ipinfo.idc_id,
-				&client->db_ipinfo) == ISC_R_FAILURE){
-
-		client->ipinfo.isp_id = -1;
-		client->ipinfo.location_id = -1;
-		client->ipinfo.idc_id = -1;
-	}
-				
 	
 	if (ns_g_server->log_queries)
 		log_query(client, saved_flags, saved_extflags);

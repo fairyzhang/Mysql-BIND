@@ -42,7 +42,7 @@ ISCLIBS =	../../lib/isc/libisc.@A@
 
 ISCDEPLIBS =	../../lib/isc/libisc.@A@
 
-LIBS =		@LIBS@ -L/usr/lib64/mysql -lmysqlclient -lcrypt -lnsl -lssl -lcrypto
+LIBS =		@LIBS@
 
 # Alphabetically
 
@@ -71,7 +71,7 @@ DNSOBJS =	acache.@O@ acl.@O@ adb.@O@ byaddr.@O@ \
 		sdlz.@O@ soa.@O@ ssu.@O@ ssu_external.@O@ \
 		stats.@O@ tcpmsg.@O@ time.@O@ timer.@O@ tkey.@O@ \
 		tsec.@O@ tsig.@O@ ttl.@O@ update.@O@ validator.@O@ \
-		version.@O@ view.@O@ xfrin.@O@ zone.@O@ zonekey.@O@ zt.@O@ mysqlip.@O@
+		version.@O@ view.@O@ xfrin.@O@ zone.@O@ zonekey.@O@ zt.@O@
 
 OBJS=		${DNSOBJS} ${OTHEROBJS} ${DSTOBJS}
 
@@ -97,7 +97,7 @@ DNSSRCS =	acache.c acl.c adb.c byaddr.c \
 		sdb.c sdlz.c soa.c ssu.c ssu_external.c \
 		stats.c tcpmsg.c time.c timer.c tkey.c \
 		tsec.c tsig.c ttl.c update.c validator.c \
-		version.c view.c xfrin.c zone.c zonekey.c zt.c mysqlip.c ${OTHERSRCS}
+		version.c view.c xfrin.c zone.c zonekey.c zt.c ${OTHERSRCS}
 
 SRCS = ${DSTSRCS} ${DNSSRCS}
 
@@ -110,12 +110,6 @@ DEPENDEXTRA =	./gen -F include/dns/rdatastruct.h \
 		-s ${srcdir} -d >> Makefile ;
 
 @BIND9_MAKE_RULES@
-
-mysqlip.@O@: mysqlip.c
-	${LIBTOOL_MODE_COMPILE} ${CC} ${ALL_CFLAGS} \
-                -I/usr/include/mysql  -g -pipe -Wp,-D_FORTIFY_SOURCE=2 -fexceptions -fstack-protector --param=ssp-buffer-size=4 -m64 -D_GNU_SOURCE -D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE -fno-strict-aliasing -fwrapv -fPIC   -DUNIV_LINUX -DUNIV_LINUX \
-		-L/usr/lib64/mysql -lmysqlclient -lz -lcrypt -lnsl -lm -lssl -lcrypto \
-		-c ${srcdir}/mysqlip.c
 
 version.@O@: version.c
 	${LIBTOOL_MODE_COMPILE} ${CC} ${ALL_CFLAGS} \

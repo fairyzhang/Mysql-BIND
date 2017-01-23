@@ -49,7 +49,10 @@ typedef struct dns_mysqlip
  *		  ipinfo : Mysql IP Information of ns_g_server (global)
  * return - result : the value of ISC_R_SUCCESS is meaning successful.
 */
-isc_result_t locate_ip_information(const dns_name_t *qname, const isc_sockaddr_t *ip,
+isc_result_t mysqlip_locate_information(const char *qname, const isc_sockaddr_t *ip,
 									isc_int16_t *isp_id, isc_int16_t *location_id, isc_int16_t *idc_id,
 									dns_mysqlip_t *ipinfo);
+
+
+
 

@@ -42,7 +42,8 @@
 
 #include <named/globals.h>
 
-#include "include/mysqldb.h"
+#include <named/mysqlip.h>
+#include <named/mysqldb.h>
 
 #include <time.h>
 /*
@@ -151,6 +152,8 @@ typedef struct mysqldb_ipinfo
 	isc_int16_t idc_id;
 }mysqldb_ipinfo_t;
 
+dns_mysqlip_t ipdb_info;
+	
 typedef struct mysqldb_datanode mysqldb_datanode_t;
 typedef struct mysqldb_datainfo mysqldb_datainfo_t;
 typedef struct mysqldb_zonedata mysqldb_zonedata_t;
@@ -211,7 +214,7 @@ static void quotestring(const char *source, char *dest)
 static isc_result_t db_connect(struct dbinfo *dbi)
 {
     if(!mysql_init(&dbi->conn))
-	    return (ISC_R_MYSQLDBNOTCONNECT);
+        return (ISC_R_MYSQLDBNOTCONNECT);
 	
     if (mysql_real_connect(&dbi->conn, dbi->host, dbi->user, dbi->passwd, dbi->database, 0, NULL, 0))
         return (ISC_R_SUCCESS);
@@ -226,7 +229,7 @@ static isc_result_t db_connect(struct dbinfo *dbi)
 static isc_result_t maybe_reconnect(struct dbinfo *dbi)
 {
     if (!mysql_ping(&dbi->conn))
-        return (ISC_R_SUCCESS);
+	    return (ISC_R_SUCCESS);
 
     return (db_connect(dbi));
 }
@@ -324,7 +327,6 @@ static int mysqldb_findrule_res(const char *domain_name,const char *fan_name,
 			
 			    if (result != ISC_R_SUCCESS)
 			        return 0;
-			 	
 				count ++;
 			}
 			
@@ -377,7 +379,7 @@ static MYSQL_RES *mysqldb_return_res(MYSQL *conn, const char *domain_name, const
 
 	res = mysql_store_result(conn);
 
-   if (mysql_num_rows(res) == 0){
+    if (mysql_num_rows(res) == 0){
 		mysql_free_result(res);
 		isc_log_write(dns_lctx, DNS_LOGCATEGORY_DATABASE,
 			      DNS_LOGMODULE_MYSQL, ISC_LOG_DEBUG(3),
@@ -385,7 +387,7 @@ static MYSQL_RES *mysqldb_return_res(MYSQL *conn, const char *domain_name, const
 			      str,__func__);
 		memset(str, '\0', sizeof(str));
 		return 0;
-   }
+    }
 		
 	memset(str, '\0', sizeof(str));
 	return res;
@@ -433,7 +435,7 @@ static int mysqldb_put_res(MYSQL *conn,const char* domain_name,const *table_name
 	int idc;
 	char *domain;
 	char *rdtype_str;
-	
+
 	struct data_info *data_info;
 		
 	if(row>1){
@@ -442,12 +444,11 @@ static int mysqldb_put_res(MYSQL *conn,const char* domain_name,const *table_name
 			isc_log_write(dns_lctx, DNS_LOGCATEGORY_DATABASE,
 					      DNS_LOGMODULE_MYSQL, ISC_LOG_ERROR,
 					      "There is no memery for Mysql driver putting res.");
-	        return (ISC_R_NOMEMORY);
+	       	return (ISC_R_NOMEMORY);
 
 	    }
 	}
-		
-    while(tmp = mysql_fetch_row(res)){
+	while(tmp = mysql_fetch_row(res)){
 		ttlstr = tmp[0];
 	    data   = tmp[1];
 		type_str = tmp[2];
@@ -457,7 +458,7 @@ static int mysqldb_put_res(MYSQL *conn,const char* domain_name,const *table_name
 		domain = tmp[6];
 		rdtype_str = tmp[7];
 		char *endp;
-	
+		
 	    ttl = strtol(ttlstr, &endp, 10);
 		type_id = strtol(type_str, &endp, 10);
 
@@ -473,8 +474,8 @@ static int mysqldb_put_res(MYSQL *conn,const char* domain_name,const *table_name
 
 			if(row>1)
 				isc_mem_put(ns_g_mctx, data,row*sizeof(struct data_info));
-				mysql_free_result(res);
-		    	return (DNS_R_BADTTL);
+			mysql_free_result(res);
+    	    return (DNS_R_BADTTL);
 	    }
 
 		if(row == 1){//if thers is only 1 record ,return it
@@ -494,7 +495,7 @@ static int mysqldb_put_res(MYSQL *conn,const char* domain_name,const *table_name
 		data_info[i].ttl = ttl;
 		strncpy(data_info[i].rdata,data,250); 
 		strncpy(data_info[i].rdtype_str,rdtype_str,sizeof("TYPE65536"));
-		
+			
 		if(strncmp(domain,fan_domain, 255) == 0){
 			data_info[i].fan_flag = 1;
 			if(row == 2)
@@ -539,7 +540,6 @@ static int mysqldb_put_res(MYSQL *conn,const char* domain_name,const *table_name
 			rule = 2;
 			if(isp_id <= 0)
 				rule = 0;
-
 		}
 	}
 
@@ -694,9 +694,9 @@ static isc_result_t mysqldb_findrule_datalist(mysqldb_datanode_t *datanode, cons
 				if(result == ISC_R_SUCCESS){
 			 		result = dns_sdb_putrr(lookup, rdtype_str, ttl, datalist->rdata);
 				
-				    if (result != ISC_R_SUCCESS) {
-				        return result;
-				 	}
+			    	if (result != ISC_R_SUCCESS)
+			             return result;
+	
 					count++;
 				}else{
 					isc_log_write(dns_lctx, DNS_LOGCATEGORY_DATABASE,
@@ -822,7 +822,6 @@ static isc_result_t mysqldb_find_datalist(mysqldb_datanode_t *datanode,
  *			      the value of ISC_R_FAILURE and other value is meaning error .
  */
 static mysqldb_datanode_t *mysqldb_find_node(const char *domain_name, mysqldb_zonedata_t *zone_data){
-	
 	mysqldb_datanode_t *datanode;
 	unsigned int hashval;
 	int i;
@@ -907,12 +906,24 @@ static isc_result_t mysqldb_lookup(const char *zone, const char *name, void *dbd
 		       		dns_clientinfo_t *clientinfo,void *ip_info,dns_rdatatype_t type, void *zone_data){
 	isc_result_t result;
 	struct dbinfo *dbi = dbdata;
-	mysqldb_ipinfo_t *mysqldb_ipinfo = ip_info;
 	mysqldb_zonedata_t *mysqldb_zonedata = zone_data;
+	isc_sockaddr_t *sip = ip_info;
+	mysqldb_ipinfo_t mysqldb_ipinfo;
+	mysqldb_ipinfo.isp_id = 0;
+	mysqldb_ipinfo.location_id = 0;
+	mysqldb_ipinfo.idc_id = 0;
 
 	UNUSED(methods);
 	UNUSED(clientinfo);
 	
+	if(mysqlip_locate_information(name,sip,
+				&mysqldb_ipinfo.isp_id,&mysqldb_ipinfo.location_id,&mysqldb_ipinfo.idc_id,
+				&ipdb_info)== ISC_R_FAILURE){
+
+		mysqldb_ipinfo.isp_id = -1;
+		mysqldb_ipinfo.location_id = -1;
+		mysqldb_ipinfo.idc_id = -1;
+	}
 	int ret_value = 0;
 	if(zone_data == NULL){
 		isc_log_write(dns_lctx, DNS_LOGCATEGORY_DATABASE,
@@ -922,19 +933,18 @@ static isc_result_t mysqldb_lookup(const char *zone, const char *name, void *dbd
 		
 		result = maybe_reconnect(dbi);
 		if (result != ISC_R_SUCCESS){
-				isc_log_write(dns_lctx, DNS_LOGCATEGORY_DATABASE,
+			isc_log_write(dns_lctx, DNS_LOGCATEGORY_DATABASE,
 				      DNS_LOGMODULE_MYSQL, ISC_LOG_ERROR,
 				      "Mysql driver lookup() Cannot connect to database: '%s' '%s' ",
 				      dbi->database,dbi->table);
-				return result;
+			return result;
 		}
 
-		ret_value = mysqldb_put_res(&dbi->conn,name,dbi->table,type,zone,lookup,mysqldb_ipinfo,&dbi->zone_info);
+		ret_value = mysqldb_put_res(&dbi->conn,name,dbi->table,type,zone,lookup,&mysqldb_ipinfo,&dbi->zone_info);
 	}else{
-		ret_value = mysqldb_find_res(zone,name,lookup, mysqldb_ipinfo, type, mysqldb_zonedata);
+		ret_value = mysqldb_find_res(zone,name,lookup, &mysqldb_ipinfo, type, mysqldb_zonedata);
 	}
 	return ret_value;
-	
 }
 
 /*
@@ -1427,7 +1437,7 @@ static isc_result_t mysqldb_zdupdate(const char *zone, const char *domain, void 
 			mysqldb_zonedata_destroy(new_zone_data);
 		}
 		return result;
-	} 
+	}
 
 	if(zone_data == NULL){
 		return (ISC_R_FAILURE);
@@ -1753,7 +1763,7 @@ static isc_result_t mysqldb_add_node(void *m_zonedata,
 	hashval = return_hashval(domain)%zonedata->hashsize;
 
 	if(hashval <0 || hashval>=zonedata->hashsize)
-		return ISC_R_FAILURE;
+		return (ISC_R_FAILURE);
 	
 	result = insert_to_hashtable(ns_g_mctx,zonedata->hashtable, hashval, domain, ttl, rdtype, isp, location,idc,rdata);
 
@@ -1793,7 +1803,6 @@ static isc_result_t mysqldb_add_nodeanddata(void *m_datanode,
 		}
 
 		return (ISC_R_SUCCESS);
-
 }
 
 /*Create zone data structure.
@@ -1934,12 +1943,12 @@ static int split_qname_by_dot(const char *qname, char **split_name){
 	split_name[0]=strtok(name, mdot);
 
 	if(split_name[0]==NULL)
-	       return 0;
+	    return 0;
 
 	for(loop=1;loop<142;loop++){
-	       split_name[loop]=strtok(NULL,mdot);
-	       if(split_name[loop]==NULL)
-	               break;
+	    split_name[loop]=strtok(NULL,mdot);
+	    if(split_name[loop]==NULL)
+	        break;
 	}
 
 	if(loop < 2)
@@ -1957,7 +1966,7 @@ static int split_qname_by_dot(const char *qname, char **split_name){
 */
 static MYSQL_RES *mysqldb_return_zonedata_res(MYSQL *conn, const char *tbl_name, char *wherestr){
 	if (conn == NULL)
-			return 0;
+		return 0;
 	
 	MYSQL_RES *res=0;
 	char str[1500];
@@ -1975,11 +1984,11 @@ static MYSQL_RES *mysqldb_return_zonedata_res(MYSQL *conn, const char *tbl_name,
 			  str,__func__);
 	     memset(str, '\0', sizeof(str));
 	     return 0;
-    }
+   }
 
 	res = mysql_store_result(conn);
 
-    if (mysql_num_rows(res) <= 0){
+   if (mysql_num_rows(res) <= 0){
 		mysql_free_result(res);
 		res = 0;
 		isc_log_write(dns_lctx, DNS_LOGCATEGORY_DATABASE,
@@ -1989,7 +1998,7 @@ static MYSQL_RES *mysqldb_return_zonedata_res(MYSQL *conn, const char *tbl_name,
 		
 		memset(str, '\0', sizeof(str));
 		return 0;
-    }
+   }
 	
 	memset(str, '\0', sizeof(str));
 	return res;

@@ -97,7 +97,7 @@
 #define BACKTRACE_MAXFRAME 128
 #endif
 
-#include "include/mysqldb.h"
+#include <named/mysqldb.h>
 
 static isc_boolean_t	want_stats = ISC_FALSE;
 static char		program_name[ISC_DIR_NAMEMAX] = "named";

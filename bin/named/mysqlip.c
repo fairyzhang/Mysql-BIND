@@ -34,7 +34,7 @@
 #include <dns/log.h>
 #include <dns/types.h>
 
-#include <dns/mysqlip.h>
+#include <named/mysqlip.h>
 
 #include <mysql.h>
 
@@ -49,13 +49,13 @@
 /*
  * Initialize Mysql IP environment, connecting mysql database
  */
-static isc_result_t dns_mysqlip_init(dns_mysqlip_t *ipinfo);
+static isc_result_t mysqlip_init(dns_mysqlip_t *ipinfo);
 
 /*
  * Destroy Mysql IP environment
  */
 
-static void dns_mysqlip_destroy(dns_mysqlip_t *ipinfo);
+static void mysqlip_destroy(dns_mysqlip_t *ipinfo);
 
 
 /*Connect to IP databse*/
@@ -77,7 +77,7 @@ static isc_result_t db_connect(dns_mysqlip_t *dbi){
  */
 static isc_result_t maybe_reconnect(dns_mysqlip_t *dbi){
     if (!mysql_ping(&dbi->conn))
-	    return (ISC_R_SUCCESS);
+        return (ISC_R_SUCCESS);
 
     return (db_connect(dbi));
 }
@@ -94,7 +94,7 @@ static isc_result_t maybe_reconnect(dns_mysqlip_t *dbi){
  * return - result : the value of 1 is meaning finding successfully.
  *			      the value of 0 is meaning error or table non-existing.
 */
-static isc_result_t find_info_from_db(MYSQL *conn,const char *ip_tbl,isc_sockaddr_t *source_ip, 
+static isc_result_t mysqlip_find_from_db(MYSQL *conn,const char *ip_tbl,isc_sockaddr_t *source_ip, 
 											isc_int16_t *isp_id, isc_int16_t *location_id, isc_int16_t *idc_id){
 	if(ip_tbl == NULL||source_ip == NULL || conn == NULL || isp_id == NULL || location_id == NULL || idc_id == NULL)
 		return 0;
@@ -107,11 +107,11 @@ static isc_result_t find_info_from_db(MYSQL *conn,const char *ip_tbl,isc_sockadd
 	char *idc_str;
 	u_char *c_ip;
 	long l_sip = htonl(source_ip->type.sin.sin_addr.s_addr) & 0xFFFFFF00;
-	snprintf(str, sizeof(str),"SELECT isp_id,location_id,idc_id FROM %s WHERE (sip <= %ld and eip>= %ld) or sip=4294967295 limit 1", ip_tbl,l_sip,l_sip);
+	snprintf(str, sizeof(str),"SELECT isp_id,location_id,idc_id FROM `%s` WHERE (sip <= %ld and eip>= %ld) or sip=4294967295 order by id limit 1", ip_tbl,l_sip,l_sip);
 
 	if( mysql_query(conn, str) != 0 ){
     	memset(str, '\0', sizeof(str));
-      	return 0;
+    	return 0;
     }
 	
     res = mysql_store_result(conn);
@@ -129,9 +129,9 @@ static isc_result_t find_info_from_db(MYSQL *conn,const char *ip_tbl,isc_sockadd
 		*location_id = 0;
 		*idc_id = 0;
         return 1;
-    }
+   	}
 
-	while ((row = mysql_fetch_row(res))){
+	while ((row = mysql_fetch_row(res))) {
         isp_str = row[0];
 		location_str = row[1];
 		idc_str = row[2];
@@ -154,7 +154,6 @@ static isc_result_t find_info_from_db(MYSQL *conn,const char *ip_tbl,isc_sockadd
 	}
 
 	return 1;
-	
 }
 
 /* split query name into arrays by '.' which are components of DB table name
@@ -165,7 +164,7 @@ static isc_result_t find_info_from_db(MYSQL *conn,const char *ip_tbl,isc_sockadd
  * return - spliting num : the value of non-zero is meaning spliting successfully.
  *					 the value of zero is meaning error or invalid query name.
 */
-static int split_qname_by_dot(const char *qname, char **split_name){
+static int mysqlip_split_qname_by_dot(const char *qname, char **split_name){
 	if(qname == NULL || split_name == NULL)
 		return 0;
 
@@ -190,7 +189,6 @@ static int split_qname_by_dot(const char *qname, char **split_name){
 	if(loop < 2)
 		return 0;
 	return loop;
-	
 }
 
 /* tranlate query name into DB table name and find IP information from Database
@@ -204,10 +202,9 @@ static int split_qname_by_dot(const char *qname, char **split_name){
  *
  * return - result : the value of ISC_R_SUCCESS is meaning successful.
 */
-static isc_result_t transname_and_locateip(MYSQL *conn, const char *qname,
+static isc_result_t mysqlip_transname_and_locateip(MYSQL *conn, const char *qname,
 										isc_sockaddr_t *source_ip, 
 										isc_int16_t *isp_id, isc_int16_t *location_id, isc_int16_t *idc_id){
-
 	if(conn == NULL || qname == NULL)
 		return 0;
 	if(source_ip== NULL || isp_id == NULL ||location_id == NULL || idc_id == NULL)
@@ -222,12 +219,13 @@ static isc_result_t transname_and_locateip(MYSQL *conn, const char *qname,
 	int start = 0;
 
 	char *tmp_tbl = tbl_name;
-	loop = split_qname_by_dot(qname,array);
+
+	loop = mysqlip_split_qname_by_dot(qname,array);
 	if(loop>4)
 		start = loop - 4;
 
 	//Merge arrays of DB table name components with '_' which are being used to  find IP information 
-	for(j = start;j< loop-2;j++){
+	for(j = start;j<=loop-2;j++){
 		tmp_tbl = tbl_name;
 		memset(tmp_tbl,'\0',255);
 		memcpy(tmp_tbl,"ip",2);
@@ -238,13 +236,13 @@ static isc_result_t transname_and_locateip(MYSQL *conn, const char *qname,
 			tmp_tbl += strlen(array[i])+1;
 		}
 		
-		if(find_info_from_db(conn, tbl_name, source_ip, isp_id, location_id, idc_id) == 1){
+		if(mysqlip_find_from_db(conn, tbl_name, source_ip, isp_id, location_id, idc_id) == 1){
 			return 1;
 		}
 	}
 
 	// Find IP information from default IP table (ip_tbl) when it could not be found from its own IP table or its zone IP table
-	if(find_info_from_db(conn,"ip_tbl",source_ip,isp_id,location_id,idc_id) == 1){
+	if(mysqlip_find_from_db(conn,"ip_tbl",source_ip,isp_id,location_id,idc_id) == 1){
 		return 1;
 	}
 
@@ -260,7 +258,7 @@ static isc_result_t transname_and_locateip(MYSQL *conn, const char *qname,
  *		  ipinfo : Mysql IP Info of ns_g_server (global)
  * return - result : the value of ISC_R_SUCCESS is meaning successful.
 */
-isc_result_t locate_ip_information(const dns_name_t *qname, const isc_sockaddr_t *ip,
+isc_result_t mysqlip_locate_information(const char *qname, const isc_sockaddr_t *ip,
 									isc_int16_t *isp_id, isc_int16_t *location_id, isc_int16_t *idc_id,
 									dns_mysqlip_t *ipinfo){
 	if(isp_id == NULL || location_id == NULL || idc_id == NULL)
@@ -273,10 +271,9 @@ isc_result_t locate_ip_information(const dns_name_t *qname, const isc_sockaddr_t
 		return (ISC_R_SUCCESS);
 	}
 
-	char namebuf[DNS_NAME_FORMATSIZE];
 	isc_result_t result;
 	
-	result = dns_mysqlip_init(ipinfo);
+	result = mysqlip_init(ipinfo);
 	if (result != ISC_R_SUCCESS){
 		isc_log_write(dns_lctx, DNS_LOGCATEGORY_DATABASE,
 			      DNS_LOGMODULE_MYSQL, ISC_LOG_ERROR,
@@ -290,15 +287,13 @@ isc_result_t locate_ip_information(const dns_name_t *qname, const isc_sockaddr_t
 		return result;
 	}
 	
-	memset(namebuf,0,sizeof(namebuf));
-	dns_name_format(qname, namebuf, sizeof(namebuf));//convert query name into string
-	if(namebuf != 0)
-		if(transname_and_locateip(&ipinfo->conn,namebuf,ip,isp_id,location_id,idc_id)){
-			dns_mysqlip_destroy(ipinfo);
+	if(qname != 0)
+		if(mysqlip_transname_and_locateip(&ipinfo->conn,qname,ip,isp_id,location_id,idc_id)){
+			mysqlip_destroy(ipinfo);
 			return (ISC_R_SUCCESS);
 		}
 		
-	dns_mysqlip_destroy(ipinfo);
+	mysqlip_destroy(ipinfo);
 	return (ISC_R_FAILURE);
 }
 
@@ -318,7 +313,7 @@ mysqlip_info_init(dns_mysqlip_t *ipinfo) {
  * Initialize Mysql IP environment, connecting to mysql database
  */
 static isc_result_t
-dns_mysqlip_init(dns_mysqlip_t *ipinfo) {
+mysqlip_init(dns_mysqlip_t *ipinfo) {
 	isc_result_t result;
 	
 	if(ipinfo == NULL)
@@ -337,14 +332,13 @@ dns_mysqlip_init(dns_mysqlip_t *ipinfo) {
 	}
 	
 	return result;
-	
 }
 
 /*
  * Destroy Mysql IP environment
  */
 static void
-dns_mysqlip_destroy(dns_mysqlip_t *ipinfo) {
+mysqlip_destroy(dns_mysqlip_t *ipinfo) {
 	mysql_close(&ipinfo->conn);
 }
 
