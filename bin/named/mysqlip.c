@@ -106,7 +106,7 @@ static isc_result_t mysqlip_find_from_db(MYSQL *conn,const char *ip_tbl,isc_sock
 	char *location_str;
 	char *idc_str;
 	u_char *c_ip;
-	long l_sip = htonl(source_ip->type.sin.sin_addr.s_addr) & 0xFFFFFF00;
+	long l_sip = htonl(source_ip->type.sin.sin_addr.s_addr) & 0xFFFFFFFF;
 	snprintf(str, sizeof(str),"SELECT isp_id,location_id,idc_id FROM `%s` WHERE (sip <= %ld and eip>= %ld) or sip=4294967295 order by id limit 1", ip_tbl,l_sip,l_sip);
 
 	if( mysql_query(conn, str) != 0 ){
